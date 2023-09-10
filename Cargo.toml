@@ -15,3 +15,4 @@ sqlx = { version = "0.7", features = [ "runtime-tokio-rustls", "sqlite"] }
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"
 leptos = { version = "0.4.10", features = ["csr", "nightly"] }
+trunk = "0.17"

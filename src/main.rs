@@ -5,6 +5,7 @@ use axum::{
     Router,
 };
 
+use leptos::*;
 use serde::Deserialize;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Pool, Row, Sqlite};
@@ -12,7 +13,9 @@ use std::{fs, net::SocketAddr};
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new()
+    mount_to_body(|cx| view! {cx, <p>"Hello world"</p>})
+
+    /* let app = Router::new()
         .route("/", get(get_home_page))
         .route("/rec", post(print_form))
         .route("/get-main-view", get(get_main_view))
@@ -22,7 +25,7 @@ async fn main() {
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
-        .unwrap();
+        .unwrap(); */
 }
 
 async fn print_form(Form(input): Form<Input>) {
