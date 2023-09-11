@@ -1,71 +1,73 @@
-use axum::{
+/*use axum::{
     extract::Form,
     response::Html,
     routing::{get, post},
     Router,
-};
+}; */
 
 use leptos::*;
 use serde::Deserialize;
-use sqlx::sqlite::SqlitePoolOptions;
-use sqlx::{Pool, Row, Sqlite};
-use std::{fs, net::SocketAddr};
+//use sqlx::sqlite::SqlitePoolOptions;
+//use sqlx::{Pool, Row, Sqlite};
 
-#[tokio::main]
-async fn main() {
-    mount_to_body(|cx| view! {cx, <p>"Hello world"</p>})
+//#[tokio::main]
+fn main() {
+    mount_to_body(|cx| view! {cx, <App/>});
+}
+#[component]
+fn App(cx: Scope) -> impl IntoView {
+    // (getter: ReadSignal<i32>, setter: WriteSignal<i32>)
+    let (count, set_count) = create_signal(cx, 0);
 
-    /* let app = Router::new()
-        .route("/", get(get_home_page))
-        .route("/rec", post(print_form))
-        .route("/get-main-view", get(get_main_view))
-        .route("/get-insert-view", get(get_insert_view));
-
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap(); */
+    // could also do {count} instead of {move || count.get()} as count is already a function
+    view! { cx,
+        <button
+            on:click=move |_| {
+            set_count.update(|x| *x += 1);
+        }>
+        "Click me: "{move || count.get()}
+        <Colors/>
+        </button>
+    }
 }
 
-async fn print_form(Form(input): Form<Input>) {
-    println!("here");
-    println!("{:?}", input);
+//shows dynamic css classes, note the style:left, etc
+#[component]
+fn Colors(cx: Scope) -> impl IntoView {
+    // can add raw html like this
+    // let html = "<p>Injected html</p>";
+    let html_str = "<p>Injected html</p>";
+    let (x, set_x) = create_signal(cx, 0);
+    let (y, set_y) = create_signal(cx, 0);
+    view! { cx,
+        <div
+                style="position: absolute"
+                style:left=move || format!("{}px", x() + 100)
+                style:top=move || format!("{}px", y() + 100)
+                style:background-color=move || format!("rgb({}, {}, 100)", x(), y())
+                style=("--columns", x)
+            >
+        "Moves when coords change"
+        </div>
+        <button
+            on:click=move |_| {set_x.update(|n| *n += 1);}
+        >"Update me"
+        </button>
+        <button
+            on:click=move |_| {set_y.update(|n| *n += 1);}
+        >"Update y"</button>
+        <div inner_html=html_str/>
+        <ProgressBar progress=y/>
+    }
 }
 
-#[derive(Deserialize, Debug)]
-struct Input {
-    name: String,
-    email: String,
-}
-
-async fn get_home_page() -> Html<String> {
-    let file = fs::read_to_string("./resources/index.html").unwrap();
-    Html(file)
-}
-
-async fn get_insert_view() -> Html<&'static str> {
-    Html(
-        r##"
-	<button hx-get="/get-main-view" 
-		hx-trigger="click"
-		hx-target="#main-content"
-		hx-swap="innerHTML"
-		>Show Main View</button>
-		<p>Insert View</p>
-        "##,
-    )
-}
-
-async fn get_main_view() -> Html<&'static str> {
-    Html(
-        r##"
-	<button hx-get="/get-insert-view" 
-		hx-trigger="click"
-		hx-target="#main-content"
-		hx-swap="innerHTML"
-		>Show Insert View</button>
-		<p>Main View</p>
-        "##,
-    )
+#[component]
+fn ProgressBar(cx: Scope, progress: ReadSignal<i32>) -> impl IntoView {
+    view! { cx,
+        <progress
+            max="50"
+            // now this works
+            value=progress
+        />
+    }
 }

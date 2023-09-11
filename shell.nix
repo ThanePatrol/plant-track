@@ -13,6 +13,7 @@ in
           ];
       })
       trunk
+      libclang
       openssl
       pkg-config
       libsodium

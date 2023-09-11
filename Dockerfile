@@ -12,4 +12,4 @@ RUN cargo install trunk
 RUN trunk build --release
 
 EXPOSE 8080
-CMD ["trunk" "serve" "--debug" "--address" "0.0.0.0"]
+CMD ["trunk" "serve" "--address" "0.0.0.0"]
