@@ -6,12 +6,12 @@ in
   stdenv.mkDerivation {
     name = "moz_overlay_shell";
     buildInputs = [
-      (nixpkgs.latest.rustChannels.nightly.rust.override {
+      (nixpkgs.latest.rustChannels.stable.rust.override {
           targets = [
             "x86_64-unknown-linux-gnu"
-            "wasm32-unknown-unknown"
           ];
-      })
+        })
+      cargo-watch
       trunk
       libclang
       openssl

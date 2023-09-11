@@ -7,12 +7,14 @@ edition = "2021"
 
 [dependencies]
 rustls = "0.21"
-#axum = "0.6"
+axum = "0.6"
 serde = "1.0.188"
 serde_derive = "1.0.188"
 serde_json = "1.0.105"
-#sqlx = { version = "0.7", features = [ "runtime-tokio-rustls", "sqlite"] }
-#tokio = { version = "1.0", features = ["full"] }
-#tracing = "0.1"
-leptos = { version = "0.4.10", features = ["csr", "nightly", "ssr"] }
-trunk = "0.17"
+sqlx = { version = "0.7", features = [ "runtime-tokio-rustls", "postgres"] }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+leptos = { version = "0.4.10", features = ["ssr"] }
+anyhow = "1"
+dotenvy = "0.15.7"
+time = { version = "0.3", features = ["serde"]}
