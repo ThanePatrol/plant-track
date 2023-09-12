@@ -8,9 +8,11 @@ use axum::{
 use anyhow::Result;
 
 use leptos::ssr::*;
+use leptos::view;
 use serde::Deserialize;
 use sqlx::postgres::{PgPoolOptions, PgRow};
-use sqlx::{Pool, Postgres,};
+use sqlx::Row;
+use sqlx::{Pool, Postgres};
 use std::fs;
 
 use std::net::SocketAddr;
@@ -23,7 +25,7 @@ type AppState = Arc<Mutex<App>>;
 async fn main() -> Result<()> {
     dotenvy::from_path("./.env").expect("Error reading .env");
 
-    let pool = init_pool(&dotenvy::var("DB_URL").unwrap()).await?;
+    let pool = init_pool(&dotenvy::var("DATABASE_URL").unwrap()).await?;
 
     let app_state = Arc::new(Mutex::new(App {
         db_pool: pool,
@@ -71,7 +73,7 @@ pub struct Users {
     pub phone: Option<String>,
 }
 
-#[derive(Deserialize, Debug, sqlx::FromRow)]
+#[derive(Deserialize, Debug)]
 pub struct Plant {
     pub plant_id: i32,
     pub user_id: i32,
@@ -94,28 +96,34 @@ pub struct PlantPhoto {
 
 #[derive(Deserialize, Debug, sqlx::FromRow)]
 pub struct Comments {
-    pub plant_id: i32, 
+    pub plant_id: i32,
     pub user_id: i32,
     pub time_made: time::OffsetDateTime,
     pub comment: String,
 }
 
-
 async fn index(State(app): State<AppState>) -> Html<String> {
     let pool = &app.lock().await.db_pool;
-    
+    let plants = get_all_plants(pool, 1).await.unwrap();
     let file = fs::read_to_string("./resources/index.html").unwrap();
     Html(file)
 }
 
-async fn get_all_plants(pool: &Pool<Postgres>, user_id: i32) -> Vec<Plant> {
-    let all_plants = sqlx::query("SELECT * FROM plants WHERE plants.user_id == ?;")
+async fn get_all_plants(pool: &Pool<Postgres>, user_id: i32) -> Result<Vec<Plant>> {
+    let rows = sqlx::query("SELECT * FROM plants WHERE user_id = $1")
         .bind(user_id)
         .fetch_all(pool)
-        .await
-        .unwrap_or(Vec::new())
-        .into_iter()
-        .map(|row| pl)
+        .await?;
+
+    for row in rows {
+        println!("{:?}", row.get::<String, _>("botanical_name"));
+    }
+
+    /*
+    sqlx::query_as!(Plant, "SELECT * FROM plants WHERE user_id = $1", user_id)
+        .fetch_all(pool)
+        .await? */
+    Ok(Vec::new())
 }
 
 async fn get_insert_view() -> Html<&'static str> {

@@ -9,27 +9,27 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS plants (
 	plant_id SERIAL PRIMARY KEY,
-	user_id INTEGER REFERENCES users(user_id),
+	user_id INTEGER REFERENCES users(user_id) NOT NULL,
 	botanical_name TEXT NOT NULL,
 	common_name TEXT NOT NULL,
-	last_fed DATE, 
-	feed_interval INTEGER, -- days until next feed
-	last_potted DATE,
-	potting_interval INTEGER, -- days until next potting
-	last_pruned DATE,
-	pruning_interval INTEGER --days until next pruning
+	last_fed DATE NOT NULL, 
+	feed_interval INTEGER NOT NULL, -- days until next feed
+	last_potted DATE NOT NULL,
+	potting_interval INTEGER NOT NULL, -- days until next potting
+	last_pruned DATE NOT NULL,
+	pruning_interval INTEGER NOT NULL --days until next pruning
 );
 -- represents a single comment
 CREATE TABLE IF NOT EXISTS comments (
-	plant_id INTEGER REFERENCES plants(plant_id),
-	user_id INTEGER REFERENCES users(user_id),
-	time_made TIMESTAMP,
+	plant_id INTEGER REFERENCES plants(plant_id) NOT NULL,
+	user_id INTEGER REFERENCES users(user_id) NOT NULL,
+	time_made TIMESTAMP NOT NULL,
 	comment TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS photos (
-	plant_id INTEGER REFERENCES plants(plant_id),
-	user_id INTEGER REFERENCES users(user_id),
+	plant_id INTEGER REFERENCES plants(plant_id) NOT NULL,
+	user_id INTEGER REFERENCES users(user_id) NOT NULL,
 	photo_uri TEXT NOT NULL
 );
 
