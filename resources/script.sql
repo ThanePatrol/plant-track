@@ -45,7 +45,12 @@ VALUES
 INSERT INTO plants (user_id, botanical_name, common_name, last_fed, feed_interval, last_potted, potting_interval, last_pruned, pruning_interval)
 VALUES
   (1, 'Ficus lyrata', 'Fiddle leaf', '2023-08-01', 30, '2023-01-01', 180, '2023-07-01', 60),
-  (2, 'Monstera deliciosa', 'Swiss Cheese', '2023-09-01', 30, '2023-03-01', 180, '2023-08-01', 90);
+  (2, 'Monstera deliciosa', 'Swiss Cheese', '2023-09-01', 30, '2023-03-01', 180, '2023-08-01', 90),
+  (1, 'Sanseveria trifasciata', 'Snake Plant', '2023-08-01', 30, '2023-01-01', 180, '2023-07-01', 60),
+  (1, 'Epiprenum aureum', 'Pothos', '2023-08-01', 30, '2023-01-01', 180, '2023-07-01', 60),
+  (1, 'Musa spp.', 'Banana', '2023-08-01', 30, '2023-01-01', 180, '2023-07-01', 60),
+  (1, 'Calathea spp.', 'Calathea', '2023-08-01', 30, '2023-01-01', 180, '2023-07-01', 60),
+  (1, 'Asplenium nidus', 'Birds Nest Fern', '2023-08-01', 30, '2023-01-01', 180, '2023-07-01', 60),
 
 -- Inserting a comment
 INSERT INTO comments (plant_id, user_id, time_made, comment)

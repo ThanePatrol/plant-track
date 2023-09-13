@@ -6,7 +6,7 @@ in
   stdenv.mkDerivation {
     name = "moz_overlay_shell";
     buildInputs = [
-      (nixpkgs.latest.rustChannels.stable.rust.override {
+      (nixpkgs.latest.rustChannels.nightly.rust.override {
           targets = [
             "x86_64-unknown-linux-gnu"
           ];

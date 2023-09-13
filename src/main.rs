@@ -7,11 +7,11 @@ use axum::{
 
 use anyhow::Result;
 
-use leptos::ssr::*;
 use leptos::view;
+use leptos::*;
 use serde::Deserialize;
 use sqlx::postgres::{PgPoolOptions, PgRow};
-use sqlx::Row;
+use sqlx::{FromRow, Row};
 use sqlx::{Pool, Postgres};
 use std::fs;
 
@@ -34,9 +34,9 @@ async fn main() -> Result<()> {
 
     let app = Router::new()
         .route("/", get(index))
-        .route("/rec", post(print_form))
         .route("/get-main-view", get(get_main_view))
         .route("/get-insert-view", get(get_insert_view))
+        .route("/add-plant", post(post_add_plant))
         .with_state(app_state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -45,17 +45,6 @@ async fn main() -> Result<()> {
         .await?;
 
     Ok(())
-}
-
-async fn print_form(Form(input): Form<Input>) {
-    println!("here");
-    println!("{:?}", input);
-}
-
-#[derive(Deserialize, Debug)]
-struct Input {
-    name: String,
-    email: String,
 }
 
 #[derive(Clone)]
@@ -73,7 +62,7 @@ pub struct Users {
     pub phone: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Plant {
     pub plant_id: i32,
     pub user_id: i32,
@@ -85,6 +74,23 @@ pub struct Plant {
     pub potting_interval: i32,
     pub last_pruned: time::Date,
     pub pruning_interval: i32,
+}
+
+impl FromRow<'_, PgRow> for Plant {
+    fn from_row(row: &PgRow) -> sqlx::Result<Self> {
+        Ok(Self {
+            plant_id: row.try_get("plant_id")?,
+            user_id: row.try_get("user_id")?,
+            botanical_name: row.try_get("botanical_name")?,
+            common_name: row.try_get("common_name")?,
+            last_fed: row.try_get("last_fed")?,
+            feed_interval: row.try_get("feed_interval")?,
+            last_potted: row.try_get("last_potted")?,
+            potting_interval: row.try_get("potting_interval")?,
+            last_pruned: row.try_get("last_pruned")?,
+            pruning_interval: row.try_get("pruning_interval")?,
+        })
+    }
 }
 
 #[derive(Deserialize, Debug, sqlx::FromRow)]
@@ -106,24 +112,111 @@ async fn index(State(app): State<AppState>) -> Html<String> {
     let pool = &app.lock().await.db_pool;
     let plants = get_all_plants(pool, 1).await.unwrap();
     let file = fs::read_to_string("./resources/index.html").unwrap();
-    Html(file)
+
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! { cx,
+            <head>
+                <script src="https://unpkg.com/htmx.org@1.9.2" integrity="sha384-L6OqL9pRWyyFU3+/bjdSri+iIphTN/bvYyM37tICVyOJkWZLpP2vGn6VUEXgzg6h" crossorigin="anonymous"></script>
+            </head>
+            <body>
+                <AddPlantView
+                    user_id=1
+                />
+            </body>
+
+        }
+    });
+
+    Html(html)
 }
 
 async fn get_all_plants(pool: &Pool<Postgres>, user_id: i32) -> Result<Vec<Plant>> {
-    let rows = sqlx::query("SELECT * FROM plants WHERE user_id = $1")
-        .bind(user_id)
+    let rows = sqlx::query_as(r#"SELECT * FROM plants WHERE user_id = 1"#)
         .fetch_all(pool)
         .await?;
+    Ok(rows)
+}
 
-    for row in rows {
-        println!("{:?}", row.get::<String, _>("botanical_name"));
+#[axum::debug_handler]
+async fn post_add_plant(State(app): State<AppState>, Form(plant): Form<Plant>) -> Html<String> {
+    println!("{:?}", plant);
+
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! {cx,
+            <PlantAddSuccess/>
+        }
+    });
+    Html(html)
+}
+
+#[component]
+pub fn PlantAddSuccess(cx: Scope) -> impl IntoView {
+    view! {cx,
+        <p>"Plant added successfully"</p>
     }
+}
 
-    /*
-    sqlx::query_as!(Plant, "SELECT * FROM plants WHERE user_id = $1", user_id)
-        .fetch_all(pool)
-        .await? */
-    Ok(Vec::new())
+#[component]
+pub fn AddPlantView(cx: Scope, user_id: i32) -> impl IntoView {
+    view! { cx,
+        <div id="add-view">
+            <form>
+                <input type="hidden" name="plant_id" value=10/>
+                <input type="hidden" name="user_id" value=user_id.to_string()/>
+                <label for="botanical_name">Botanical name: </label>
+                <input type="text" name="botanical_name" id="botanical_name" required />
+                <label for="common_name">Common name: </label>
+                <input type="text" name="common_name" id="common_name" required />
+                <label for="last_fed">Last fertilized: </label>
+                <input type="date" name="last_fed" id="last_fed" required />
+                <label for="feed_interval">Fertilizing interval in days: </label>
+                <input type="number" name="feed_interval" id="feed_interval" required />
+                <label for="last_potted">Last Potted: </label>
+                <input type="date" name="last_potted" id="last_potted" required />
+                <label for="potting_interval">Potting interval in days: </label>
+                <input type="number" name="potting_interval" id="potting_interval" required />
+                <label for="last_pruned">Last pruned: </label>
+                <input type="date" name="last_pruned" id="last_pruned" required />
+                <label for="pruning_interval">Pruning interval in days: </label>
+                <input type="number" name="pruning_interval" id="pruning_interval" required />
+            </form>
+            <button hx-post="/add-plant"
+                    hx-trigger="click"
+                    hx-target="#add-view"
+                    hx-swap="outerHTML"
+            >Add new plant</button>
+        </div>
+
+    }
+}
+
+#[component]
+pub fn PlantView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
+    let (plants, _) = create_signal(cx, plants);
+
+    view! { cx,
+        <ul id="plants">
+            <For
+                //get each item we iterate over
+                each=move || plants.get()
+                key=|plant| plant.plant_id
+                view=move |cx, plant: Plant| {
+                    view! { cx,
+                        <PlantItem plant=plant />
+                    }
+                }
+            />
+        </ul>
+    }
+}
+
+#[component]
+pub fn PlantItem(cx: Scope, plant: Plant) -> impl IntoView {
+    view! { cx,
+        <div>
+            <div>botanical name: {plant.botanical_name}</div>
+        </div>
+    }
 }
 
 async fn get_insert_view() -> Html<&'static str> {
