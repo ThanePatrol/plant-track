@@ -137,8 +137,8 @@ async fn get_all_plants(pool: &Pool<Postgres>, user_id: i32) -> Result<Vec<Plant
     Ok(rows)
 }
 
-#[axum::debug_handler]
 async fn post_add_plant(State(app): State<AppState>, Form(plant): Form<Plant>) -> Html<String> {
+    println!("here");
     println!("{:?}", plant);
 
     let html = leptos::ssr::render_to_string(move |cx| {
@@ -179,12 +179,14 @@ pub fn AddPlantView(cx: Scope, user_id: i32) -> impl IntoView {
                 <input type="date" name="last_pruned" id="last_pruned" required />
                 <label for="pruning_interval">Pruning interval in days: </label>
                 <input type="number" name="pruning_interval" id="pruning_interval" required />
-            </form>
-            <button hx-post="/add-plant"
+                <input type="submit"
+                    hx-post="/add-plant"
                     hx-trigger="click"
                     hx-target="#add-view"
                     hx-swap="outerHTML"
-            >Add new plant</button>
+                    >Add new plant</input>
+
+            </form>
         </div>
 
     }
