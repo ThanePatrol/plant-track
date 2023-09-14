@@ -13,7 +13,8 @@ use serde::Deserialize;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{FromRow, Row};
 use sqlx::{Pool, Postgres};
-use std::fs;
+use std::{fmt::Display, fs};
+use time::{format_description, Duration};
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -34,9 +35,9 @@ async fn main() -> Result<()> {
 
     let app = Router::new()
         .route("/", get(index))
-        .route("/get-main-view", get(get_main_view))
-        .route("/get-insert-view", get(get_insert_view))
         .route("/add-plant", post(post_add_plant))
+        .route("/plant-view", get(get_plant_view))
+        .route("/add-view", get(get_add_view))
         .with_state(app_state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -119,8 +120,8 @@ async fn index(State(app): State<AppState>) -> Html<String> {
                 <script src="https://unpkg.com/htmx.org@1.9.2" integrity="sha384-L6OqL9pRWyyFU3+/bjdSri+iIphTN/bvYyM37tICVyOJkWZLpP2vGn6VUEXgzg6h" crossorigin="anonymous"></script>
             </head>
             <body>
-                <AddPlantView
-                    user_id=1
+                <MainView
+                    plants=plants
                 />
             </body>
 
@@ -131,22 +132,112 @@ async fn index(State(app): State<AppState>) -> Html<String> {
 }
 
 async fn get_all_plants(pool: &Pool<Postgres>, user_id: i32) -> Result<Vec<Plant>> {
-    let rows = sqlx::query_as(r#"SELECT * FROM plants WHERE user_id = 1"#)
+    let rows = sqlx::query_as(r#"SELECT * FROM plants WHERE user_id = $1"#)
+        .bind(user_id)
         .fetch_all(pool)
         .await?;
     Ok(rows)
 }
 
-#[axum::debug_handler]
+//todo add validation that checks if user_id is the same as what was submitted in the form
 async fn post_add_plant(State(app): State<AppState>, Form(plant): Form<Plant>) -> Html<String> {
-    println!("{:?}", plant);
+    let pool = &app.lock().await.db_pool;
 
+    let html;
+
+    match sqlx::query(
+        "INSERT INTO plants (user_id, botanical_name, common_name, last_fed, feed_interval, \
+            last_potted, potting_interval, last_pruned, pruning_interval)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ",
+    )
+    .bind(plant.user_id)
+    .bind(plant.botanical_name)
+    .bind(plant.common_name)
+    .bind(plant.last_fed)
+    .bind(plant.feed_interval)
+    .bind(plant.last_potted)
+    .bind(plant.potting_interval)
+    .bind(plant.last_pruned)
+    .bind(plant.pruning_interval)
+    .execute(pool)
+    .await
+    {
+        Ok(_) => {
+            html = leptos::ssr::render_to_string(move |cx| {
+                view! {cx,
+                    <PlantAddSuccess/>
+                }
+            });
+        }
+        Err(e) => {
+            html = leptos::ssr::render_to_string(move |cx| {
+                view! {cx,
+                    <PlantAddFailure
+                        error = e.to_string()
+                    />
+                    <AddPlantView
+                       user_id = plant.user_id
+                    />
+                }
+            });
+        }
+    }
+
+    Html(html)
+}
+
+pub async fn get_add_view(State(app): State<AppState>) -> Html<String> {
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
-            <PlantAddSuccess/>
+            <AddPlantView
+                user_id=1 //todo - state based value
+            />
         }
     });
     Html(html)
+}
+
+pub async fn get_plant_view(State(app): State<AppState>) -> Html<String> {
+    let pool = &app.lock().await.db_pool;
+    let plants = get_all_plants(pool, -1).await.unwrap(); //todo - show default screen
+
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! {cx,
+            <PlantView
+                plants=plants
+            />
+        }
+    });
+    Html(html)
+}
+
+#[component]
+pub fn MainView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
+    view! {cx,
+        <div class="button-bar">
+            <button id="view-button"
+                hx-get="/plant-view"
+                hx-trigger="click"
+                hx-target="#main-view"
+                hx-swap="innerHTML"
+            >"View plants"</button>
+
+            <button id="update-button">"Update plants"</button> //todo - add view plant func.
+            <button id="add-button"
+                hx-get="/add-view"
+                hx-trigger="click"
+                hx-target="#main-view"
+                hx-swap="innerHTML"
+            >"Add plant"</button>
+        </div>
+        <main id="main-view">
+            <PlantView
+                plants=plants
+            />
+        </main>
+
+    }
 }
 
 #[component]
@@ -157,11 +248,21 @@ pub fn PlantAddSuccess(cx: Scope) -> impl IntoView {
 }
 
 #[component]
+pub fn PlantAddFailure(cx: Scope, error: String) -> impl IntoView {
+    view! {cx,
+        <p>"Plant not added! Please trying adding it again"</p>
+        <p>"The following error code was encounted:" {move || error.clone()}</p>
+    }
+}
+
+/// Form for adding plants, user_id is prefilled on server.
+///
+#[component]
 pub fn AddPlantView(cx: Scope, user_id: i32) -> impl IntoView {
     view! { cx,
         <div id="add-view">
             <form>
-                <input type="hidden" name="plant_id" value=10/>
+                <input type="hidden" name="plant_id" value=-1/>
                 <input type="hidden" name="user_id" value=user_id.to_string()/>
                 <label for="botanical_name">Botanical name: </label>
                 <input type="text" name="botanical_name" id="botanical_name" required />
@@ -212,37 +313,24 @@ pub fn PlantView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
 
 #[component]
 pub fn PlantItem(cx: Scope, plant: Plant) -> impl IntoView {
+    let (feed_days, pot_days, prune_days) = get_days_till_next_feed(&plant);
+    let format = format_description::parse("[year]-[month]-[day]").unwrap();
+    let feed_date = (plant.last_fed.format(&format)).unwrap();
+    let pot_date = (plant.last_potted.format(&format)).unwrap();
+    let prune_date = (plant.last_pruned.format(&format)).unwrap();
+
     view! { cx,
-        <div>
-            <div>botanical name: {plant.botanical_name}</div>
+        <div class="plant-container">
+            <div>Botanical name: {plant.botanical_name}</div>
+            <div>Common name: {plant.common_name}</div>
+            <div>Last fed: {feed_date}</div>
+            <div>Time to next feeding cycle: {feed_days}</div>
+            <div>Last potted: {pot_date}</div>
+            <div>Time to next potting cycle: {pot_days}</div>
+            <div>Last fed: {prune_date}</div>
+            <div>Time to next pruning cycle: {prune_days}</div>
         </div>
     }
-}
-
-async fn get_insert_view() -> Html<&'static str> {
-    Html(
-        r##"
-	<button hx-get="/get-main-view" 
-		hx-trigger="click"
-		hx-target="#main-content"
-		hx-swap="innerHTML"
-		>Show Main View</button>
-		<p>Insert View, something something</p>
-        "##,
-    )
-}
-
-async fn get_main_view() -> Html<&'static str> {
-    Html(
-        r##"
-	<button hx-get="/get-insert-view" 
-		hx-trigger="click"
-		hx-target="#main-content"
-		hx-swap="innerHTML"
-		>Show Insert View</button>
-		<p>Main View</p>
-        "##,
-    )
 }
 
 async fn init_pool(db_url: &str) -> Result<Pool<Postgres>> {
@@ -251,4 +339,20 @@ async fn init_pool(db_url: &str) -> Result<Pool<Postgres>> {
         .connect(db_url)
         .await?;
     Ok(pool)
+}
+
+fn get_days_till_next_feed(plant: &Plant) -> (i64, i64, i64) {
+    fn do_sub(last: time::Date, days: i32) -> i64 {
+        let cur_date = time::OffsetDateTime::now_utc();
+
+        let next_date = cur_date + time::Duration::days(days as i64);
+
+        (next_date - cur_date).whole_days()
+    }
+
+    (
+        do_sub(plant.last_fed, plant.feed_interval),
+        do_sub(plant.last_potted, plant.potting_interval),
+        do_sub(plant.last_pruned, plant.pruning_interval),
+    )
 }
