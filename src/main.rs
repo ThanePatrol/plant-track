@@ -280,12 +280,14 @@ pub fn AddPlantView(cx: Scope, user_id: i32) -> impl IntoView {
                 <input type="date" name="last_pruned" id="last_pruned" required />
                 <label for="pruning_interval">Pruning interval in days: </label>
                 <input type="number" name="pruning_interval" id="pruning_interval" required />
-            </form>
-            <button hx-post="/add-plant"
+                <input type="submit"
+                    hx-post="/add-plant"
                     hx-trigger="click"
                     hx-target="#add-view"
                     hx-swap="outerHTML"
-            >Add new plant</button>
+                    >Add new plant</input>
+
+            </form>
         </div>
 
     }
