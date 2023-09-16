@@ -1,0 +1,11 @@
+# todo
+- Add update view
+- update view backend integration
+- frontend styling
+    - grid layout for main view
+    - style individual components
+    - 
+- notification options
+- add comments to plant component
+- sort by date of feed/prune/pot
+- comment search
