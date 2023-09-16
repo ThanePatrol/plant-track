@@ -1,7 +1,7 @@
 use axum::{
     extract::{Form, State},
     response::Html,
-    routing::{get, post},
+    routing::{get, get_service, post},
     Router,
 };
 
@@ -13,12 +13,14 @@ use serde::Deserialize;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{FromRow, Row};
 use sqlx::{Pool, Postgres};
-use std::{fmt::Display, fs};
+use std::rc::Rc;
 use time::{format_description, Duration};
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+use tower_http::services::ServeDir;
 
 type AppState = Arc<Mutex<App>>;
 
@@ -34,6 +36,7 @@ async fn main() -> Result<()> {
     }));
 
     let app = Router::new()
+        .nest_service("/css", get_service(ServeDir::new("resources/css")))
         .route("/", get(index))
         .route("/add-plant", post(post_add_plant))
         .route("/plant-view", get(get_plant_view))
@@ -47,11 +50,16 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-
 #[derive(Clone)]
 pub struct App {
     pub db_pool: Pool<Postgres>,
     pub state: Vec<i32>, //todo - some proper state for the app as a whole
+}
+
+#[derive(Debug)]
+pub struct UserState {
+    user_id: usize,
+    plants: Rc<Vec<Plant>>, //to cache the current list of plants, rather than always hitting db
 }
 
 #[derive(Deserialize, Debug, sqlx::FromRow)]
@@ -112,12 +120,13 @@ pub struct Comments {
 async fn index(State(app): State<AppState>) -> Html<String> {
     let pool = &app.lock().await.db_pool;
     let plants = get_all_plants(pool, 1).await.unwrap();
-    let file = fs::read_to_string("./resources/index.html").unwrap();
 
     let html = leptos::ssr::render_to_string(move |cx| {
         view! { cx,
             <head>
                 <script src="https://unpkg.com/htmx.org@1.9.2" integrity="sha384-L6OqL9pRWyyFU3+/bjdSri+iIphTN/bvYyM37tICVyOJkWZLpP2vGn6VUEXgzg6h" crossorigin="anonymous"></script>
+                <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet"/>
+                <link rel="stylesheet" href="./css/styles.css"/>
             </head>
             <body>
                 <MainView
@@ -200,7 +209,7 @@ pub async fn get_add_view(State(app): State<AppState>) -> Html<String> {
 
 pub async fn get_plant_view(State(app): State<AppState>) -> Html<String> {
     let pool = &app.lock().await.db_pool;
-    let plants = get_all_plants(pool, -1).await.unwrap(); //todo - show default screen
+    let plants = get_all_plants(pool, 1).await.unwrap(); //todo - show default screen
 
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
@@ -230,6 +239,10 @@ pub fn MainView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
                 hx-target="#main-view"
                 hx-swap="innerHTML"
             >"Add plant"</button>
+        </div>
+        <div class="button-bar">
+            <button id="sort-by-feed">"Sort by fertilizer requirements"</button>
+
         </div>
         <main id="main-view">
             <PlantView
@@ -298,7 +311,7 @@ pub fn PlantView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
     let (plants, _) = create_signal(cx, plants);
 
     view! { cx,
-        <ul id="plants">
+        <ul id="plants" class="plant-view">
             <For
                 //get each item we iterate over
                 each=move || plants.get()
@@ -322,7 +335,7 @@ pub fn PlantItem(cx: Scope, plant: Plant) -> impl IntoView {
     let prune_date = (plant.last_pruned.format(&format)).unwrap();
 
     view! { cx,
-        <div class="plant-container">
+        <li class="plant-container">
             <div>Botanical name: {plant.botanical_name}</div>
             <div>Common name: {plant.common_name}</div>
             <div>Last fed: {feed_date}</div>
@@ -331,7 +344,7 @@ pub fn PlantItem(cx: Scope, plant: Plant) -> impl IntoView {
             <div>Time to next potting cycle: {pot_days}</div>
             <div>Last fed: {prune_date}</div>
             <div>Time to next pruning cycle: {prune_days}</div>
-        </div>
+        </li>
     }
 }
 

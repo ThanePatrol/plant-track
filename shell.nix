@@ -11,15 +11,11 @@ in
             "x86_64-unknown-linux-gnu"
           ];
         })
-      cargo-watch
-      trunk
       libclang
       openssl
       pkg-config
-      libsodium
       zlib
       binutils
-      glibc
     ];
 
   }
