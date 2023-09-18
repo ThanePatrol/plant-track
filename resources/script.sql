@@ -101,6 +101,9 @@ VALUES
   (1, 'Zamioculcas zamiifolia', 'Zanzibar Gem', '2023-08-01', 30, '2023-01-01', 180, '2023-07-01', 60),
   (1, 'Ctenanthe setosa "Grey Star"', 'Grey Star Ctenanthe', '2023-08-01', 30, '2023-01-01', 180, '2023-07-01', 60);
 
+UPDATE plants
+SET last_fed = '2022-01-01'
+WHERE plant_id = 1;
 
 
 

@@ -28,7 +28,24 @@ pub fn MainView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
                     >"Add plant"</button>
                 </div>
                 <div class="button-bar-child button-bar-child-right">
-                    <button id="sort-by-feed">"Sort by fertilizer requirements"</button>
+                    <button id="sort-by-feed"
+                        hx-get="/sort-by-feed"
+                        hx-trigger="click"
+                        hx-target="#plants"
+                        hx-swap="outerHTML"
+                    >"Sort by least recently fed"</button>
+                    <button id="sort-by-pot"
+                        hx-get="/sort-by-pot"
+                        hx-trigger="click"
+                        hx-target="#plants"
+                        hx-swap="outerHTML"
+                    >"Sort by least recently potted"</button>
+                    <button id="sort-by-prune"
+                        hx-get="/sort-by-prune"
+                        hx-trigger="click"
+                        hx-target="#plants"
+                        hx-swap="outerHTML"
+                    >"Sort by least recently pruned"</button>
                 </div>
             </div>
             <main id="main-view">
@@ -42,9 +59,10 @@ pub fn MainView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
 }
 
 #[component]
-pub fn PlantAddSuccess(cx: Scope) -> impl IntoView {
+pub fn PlantAddSuccess(cx: Scope, plant: Plant) -> impl IntoView {
     view! {cx,
         <p>"Plant added successfully"</p>
+        <p>""//TODO - add all plant fields including ID
     }
 }
 
@@ -133,5 +151,16 @@ pub fn PlantItem(cx: Scope, plant: Plant) -> impl IntoView {
             <div>Last fed: {prune_date}</div>
             <div>Time to next pruning cycle: {prune_days}</div>
         </li>
+    }
+}
+
+#[component]
+pub fn EmailItem(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
+    view! { cx,
+        <h1>"These plants require attention!"</h1>
+        <h3>"Sorry to bother you but your little green plant friends require some attention!"</h3>
+        <PlantView
+            plants=plants
+        />
     }
 }

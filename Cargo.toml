@@ -20,3 +20,4 @@ dotenvy = "0.15.7"
 time = { version = "0.3.28", features = ["serde", "parsing"]}
 tower-http = { version = "0.4", features = ["fs"]}
 tower = { version = "0.4", features = ["full"] }
+mail-send = { version = "0.4" }

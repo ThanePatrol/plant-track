@@ -41,4 +41,40 @@ pub async fn add_plant_to_db(pool: &Pool<Postgres>, plant: Plant) -> Result<PgQu
     Ok(result)
 }
 
-//todo add validation that checks if user_id is the same as what was submitted in the form
+pub async fn get_plants_that_need_attention(
+    pool: &Pool<Postgres>,
+    user_id: i32,
+) -> Result<Vec<Plant>> {
+    let rows = sqlx::query_as(
+        r#"
+
+        SELECT 
+          * 
+        FROM 
+          plants 
+        WHERE 
+          user_id = $1
+          AND (
+            last_fed < CURRENT_DATE - feed_interval * INTERVAL '1 day'
+            OR 
+            last_potted < CURRENT_DATE - potting_interval * INTERVAL '1 day'
+            OR 
+            last_pruned < CURRENT_DATE - pruning_interval * INTERVAL '1 day'
+          );
+    "#,
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn get_user_email(pool: &Pool<Postgres>, user_id: i32) -> Result<String> {
+    let email = sqlx::query("SELECT email FROM users WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+        .get::<String, _>("email");
+    Ok(email)
+}

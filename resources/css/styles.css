@@ -28,8 +28,9 @@ li {
 	gap: 1em;
 }
 
-.button-bar-chil,.button-bar-child-right {
+.button-bar-child,.button-bar-child-right {
 	justify-content: flex-end;
+	flex: 1;
 }
 
 .main-buttons {
@@ -37,6 +38,7 @@ li {
 }
 
 .plant-view {
+	padding-top: 1em;
 	display: grid;
 	grid-template-rows: 30% 30% 30%;
 	grid-template-columns: 30% 30% 30%;
@@ -46,8 +48,16 @@ li {
 }
 
 .plant-container {
+	padding: 1em;
 	border-style: solid;
 	border-color: green;
 	border-radius: 1px;
+	box-shadow: 2px 2px green; 
+}
 
+#add-view {
+	display: grid;
+	grid-template-rows: 20% 20%;
+	grid-template-columns: 10% 10% 10% 10% 10%;
+	gap: 1em;	
 }
