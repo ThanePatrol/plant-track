@@ -22,6 +22,12 @@ use tokio::sync::Mutex;
 
 use tower_http::services::ServeDir;
 
+mod components;
+use components::*;
+
+mod db_api;
+use db_api::*;
+
 type AppState = Arc<Mutex<App>>;
 
 #[tokio::main]
@@ -140,62 +146,6 @@ async fn index(State(app): State<AppState>) -> Html<String> {
     Html(html)
 }
 
-async fn get_all_plants(pool: &Pool<Postgres>, user_id: i32) -> Result<Vec<Plant>> {
-    let rows = sqlx::query_as(r#"SELECT * FROM plants WHERE user_id = $1"#)
-        .bind(user_id)
-        .fetch_all(pool)
-        .await?;
-    Ok(rows)
-}
-
-//todo add validation that checks if user_id is the same as what was submitted in the form
-async fn post_add_plant(State(app): State<AppState>, Form(plant): Form<Plant>) -> Html<String> {
-    let pool = &app.lock().await.db_pool;
-
-    let html;
-
-    match sqlx::query(
-        "INSERT INTO plants (user_id, botanical_name, common_name, last_fed, feed_interval, \
-            last_potted, potting_interval, last_pruned, pruning_interval)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ",
-    )
-    .bind(plant.user_id)
-    .bind(plant.botanical_name)
-    .bind(plant.common_name)
-    .bind(plant.last_fed)
-    .bind(plant.feed_interval)
-    .bind(plant.last_potted)
-    .bind(plant.potting_interval)
-    .bind(plant.last_pruned)
-    .bind(plant.pruning_interval)
-    .execute(pool)
-    .await
-    {
-        Ok(_) => {
-            html = leptos::ssr::render_to_string(move |cx| {
-                view! {cx,
-                    <PlantAddSuccess/>
-                }
-            });
-        }
-        Err(e) => {
-            html = leptos::ssr::render_to_string(move |cx| {
-                view! {cx,
-                    <PlantAddFailure
-                        error = e.to_string()
-                    />
-                    <AddPlantView
-                       user_id = plant.user_id
-                    />
-                }
-            });
-        }
-    }
-
-    Html(html)
-}
-
 pub async fn get_add_view(State(app): State<AppState>) -> Html<String> {
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
@@ -221,139 +171,36 @@ pub async fn get_plant_view(State(app): State<AppState>) -> Html<String> {
     Html(html)
 }
 
-#[component]
-pub fn MainView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
-    view! {cx,
-        <div class="button-bar">
-            <button id="view-button"
-                hx-get="/plant-view"
-                hx-trigger="click"
-                hx-target="#main-view"
-                hx-swap="innerHTML"
-            >"View plants"</button>
+pub async fn post_add_plant(State(app): State<AppState>, Form(plant): Form<Plant>) -> Html<String> {
+    let pool = &app.lock().await.db_pool;
 
-            <button id="update-button">"Update plants"</button> //todo - add view plant func.
-            <button id="add-button"
-                hx-get="/add-view"
-                hx-trigger="click"
-                hx-target="#main-view"
-                hx-swap="innerHTML"
-            >"Add plant"</button>
-        </div>
-        <div class="button-bar">
-            <button id="sort-by-feed">"Sort by fertilizer requirements"</button>
+    let html;
 
-        </div>
-        <main id="main-view">
-            <PlantView
-                plants=plants
-            />
-        </main>
+    let res = db_api::add_plant_to_db(pool, plant.clone()).await;
 
-    }
-}
-
-#[component]
-pub fn PlantAddSuccess(cx: Scope) -> impl IntoView {
-    view! {cx,
-        <p>"Plant added successfully"</p>
-    }
-}
-
-#[component]
-pub fn PlantAddFailure(cx: Scope, error: String) -> impl IntoView {
-    view! {cx,
-        <p>"Plant not added! Please trying adding it again"</p>
-        <p>"The following error code was encounted:" {move || error.clone()}</p>
-    }
-}
-
-/// Form for adding plants, user_id is prefilled on server.
-///
-#[component]
-pub fn AddPlantView(cx: Scope, user_id: i32) -> impl IntoView {
-    view! { cx,
-        <div id="add-view">
-            <form>
-                <input type="hidden" name="plant_id" value=-1/>
-                <input type="hidden" name="user_id" value=user_id.to_string()/>
-                <label for="botanical_name">Botanical name: </label>
-                <input type="text" name="botanical_name" id="botanical_name" required />
-                <label for="common_name">Common name: </label>
-                <input type="text" name="common_name" id="common_name" required />
-                <label for="last_fed">Last fertilized: </label>
-                <input type="date" name="last_fed" id="last_fed" required />
-                <label for="feed_interval">Fertilizing interval in days: </label>
-                <input type="number" name="feed_interval" id="feed_interval" required />
-                <label for="last_potted">Last Potted: </label>
-                <input type="date" name="last_potted" id="last_potted" required />
-                <label for="potting_interval">Potting interval in days: </label>
-                <input type="number" name="potting_interval" id="potting_interval" required />
-                <label for="last_pruned">Last pruned: </label>
-                <input type="date" name="last_pruned" id="last_pruned" required />
-                <label for="pruning_interval">Pruning interval in days: </label>
-                <input type="number" name="pruning_interval" id="pruning_interval" required />
-                <input type="submit"
-                    hx-post="/add-plant"
-                    hx-trigger="click"
-                    hx-target="#add-view"
-                    hx-swap="outerHTML"
-                    >Add new plant</input>
-
-            </form>
-        </div>
-
-    }
-}
-
-#[component]
-pub fn PlantView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
-    let (plants, _) = create_signal(cx, plants);
-
-    view! { cx,
-        <ul id="plants" class="plant-view">
-            <For
-                //get each item we iterate over
-                each=move || plants.get()
-                key=|plant| plant.plant_id
-                view=move |cx, plant: Plant| {
-                    view! { cx,
-                        <PlantItem plant=plant />
-                    }
+    match res {
+        Ok(_) => {
+            html = leptos::ssr::render_to_string(move |cx| {
+                view! {cx,
+                    <PlantAddSuccess/>
                 }
-            />
-        </ul>
+            });
+        }
+        Err(e) => {
+            html = leptos::ssr::render_to_string(move |cx| {
+                view! {cx,
+                    <PlantAddFailure
+                        error = e.to_string()
+                    />
+                    <AddPlantView
+                       user_id = plant.user_id
+                    />
+                }
+            });
+        }
     }
-}
 
-#[component]
-pub fn PlantItem(cx: Scope, plant: Plant) -> impl IntoView {
-    let (feed_days, pot_days, prune_days) = get_days_till_next_feed(&plant);
-    let format = format_description::parse("[year]-[month]-[day]").unwrap();
-    let feed_date = (plant.last_fed.format(&format)).unwrap();
-    let pot_date = (plant.last_potted.format(&format)).unwrap();
-    let prune_date = (plant.last_pruned.format(&format)).unwrap();
-
-    view! { cx,
-        <li class="plant-container">
-            <div>Botanical name: {plant.botanical_name}</div>
-            <div>Common name: {plant.common_name}</div>
-            <div>Last fed: {feed_date}</div>
-            <div>Time to next feeding cycle: {feed_days}</div>
-            <div>Last potted: {pot_date}</div>
-            <div>Time to next potting cycle: {pot_days}</div>
-            <div>Last fed: {prune_date}</div>
-            <div>Time to next pruning cycle: {prune_days}</div>
-        </li>
-    }
-}
-
-async fn init_pool(db_url: &str) -> Result<Pool<Postgres>> {
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(db_url)
-        .await?;
-    Ok(pool)
+    Html(html)
 }
 
 fn get_days_till_next_feed(plant: &Plant) -> (i64, i64, i64) {
