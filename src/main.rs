@@ -34,6 +34,9 @@ use db_api::*;
 
 type AppState = Arc<Mutex<App>>;
 
+static DOES_NOT_NEED: i32 = 100_000; //Sentinel value for a fertilizer/pot/prune interval where
+                                     //the user marks it as not relevant for a particular plant
+
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::from_path("./.env").expect("Error reading .env");
@@ -190,15 +193,19 @@ pub async fn get_sorted_feed_plant_view(State(app): State<AppState>) -> Html<Str
     Html(html)
 }
 
-pub async fn post_add_plant(State(app): State<AppState>, Form(plant): Form<Plant>) -> Html<String> {
+pub async fn post_add_plant(
+    State(app): State<AppState>,
+    Form(mut plant): Form<Plant>,
+) -> Html<String> {
     let pool = &app.lock().await.db_pool;
 
     let html;
 
-    let res = db_api::add_plant_to_db(pool, plant.clone()).await;
+    let plant_id = db_api::add_plant_to_db(pool, plant.clone()).await;
 
-    match res {
-        Ok(_) => {
+    match plant_id {
+        Ok(id) => {
+            plant.plant_id = id;
             html = leptos::ssr::render_to_string(move |cx| {
                 view! {cx,
                     <PlantAddSuccess

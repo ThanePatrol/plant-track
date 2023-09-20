@@ -20,11 +20,12 @@ pub async fn get_all_plants(pool: &Pool<Postgres>, user_id: i32) -> Result<Vec<P
     Ok(rows)
 }
 
-pub async fn add_plant_to_db(pool: &Pool<Postgres>, plant: Plant) -> Result<PgQueryResult> {
+pub async fn add_plant_to_db(pool: &Pool<Postgres>, plant: Plant) -> Result<i32> {
     let result = sqlx::query(
         "INSERT INTO plants (user_id, botanical_name, common_name, last_fed, feed_interval, \
             last_potted, potting_interval, last_pruned, pruning_interval)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING plant_id
         ",
     )
     .bind(plant.user_id)
@@ -36,9 +37,9 @@ pub async fn add_plant_to_db(pool: &Pool<Postgres>, plant: Plant) -> Result<PgQu
     .bind(plant.potting_interval)
     .bind(plant.last_pruned)
     .bind(plant.pruning_interval)
-    .execute(pool)
+    .fetch_one(pool)
     .await?;
-    Ok(result)
+    Ok(result.get::<i32, _>("plant_id"))
 }
 
 pub async fn get_plants_that_need_attention(
