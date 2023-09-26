@@ -87,6 +87,29 @@ pub async fn get_plant_from_id(
     Ok(row)
 }
 
+pub async fn update_plant(pool: &Pool<Postgres>, plant: Plant) -> Result<()> {
+    let _ = sqlx::query(
+        r#"
+        UPDATE plants
+        SET botanical_name = $1, common_name = $2, last_fed = $3, feed_interval = $4, 
+        last_potted = $5, potting_interval = $6, last_pruned = $7, pruning_interval = $8
+        WHERE plant_id = $9
+        "#,
+    )
+    .bind(plant.botanical_name)
+    .bind(plant.common_name)
+    .bind(plant.last_fed)
+    .bind(plant.feed_interval)
+    .bind(plant.last_potted)
+    .bind(plant.potting_interval)
+    .bind(plant.last_pruned)
+    .bind(plant.pruning_interval)
+    .bind(plant.plant_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn get_user_email(pool: &Pool<Postgres>, user_id: i32) -> Result<String> {
     let email = sqlx::query("SELECT email FROM users WHERE user_id = $1")
         .bind(user_id)

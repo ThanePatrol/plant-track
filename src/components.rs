@@ -124,11 +124,12 @@ pub fn AddPlantView(cx: Scope, user_id: i32, plant_id: Option<i32>, text: String
                 <input class="prune-vis" type="number" name="pruning_interval" id="pruning_interval" required />
 
                 <input type="submit"
+                    value=text
                     hx-post="/add-plant"
                     hx-trigger="click"
                     hx-target="#add-view"
                     hx-swap="outerHTML"
-                    >text</input>
+                    />
 
             </form>
             <script>
@@ -219,11 +220,12 @@ pub fn PlantItem(cx: Scope, plant: Plant) -> impl IntoView {
             <form>
                 <input type="number" name="plant_id" hidden="true" value=plant.plant_id/>
                 <input type="submit"
+                value="Update plant"
                 hx-post="/update-view"
                 hx-trigger="click"
                 hx-target="#main-view"
                 hx-swap="innerHTML"
-                >"Update plant"</input>
+                />
             </form>
         </div>
     }
@@ -242,14 +244,77 @@ pub fn EmailItem(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
 
 #[component]
 pub fn UpdateView(cx: Scope, plant: Plant, user_id: i32) -> impl IntoView {
+    let format = time::format_description::parse("[year]-[month]-[day]").unwrap();
+    let feed_date = (plant.last_fed.format(&format)).unwrap();
+    let pot_date = (plant.last_potted.format(&format)).unwrap();
+    let prune_date = (plant.last_pruned.format(&format)).unwrap();
+
     view! { cx,
-        <h2>"Current plant details"</h2>
-        <PlantItem plant=plant.clone() />
-        <h2>"Fields to update"</h2>
-        <AddPlantView
-            user_id=user_id
-            plant_id=Some(plant.plant_id)
-            text="Update Plant".into()
-        />
+        <h2>"Details to Update"</h2>
+        <div class="plant-container">
+            <form
+                hx-post="/update-plant"
+                hx-trigger="submit"
+                hx-target="#main-view"
+                hx-swap="innerHTML"
+            >
+                <div>
+                <label>
+                    <input type="number" name="user_id" hidden="true" value=user_id/>
+                    "Plant id: "
+                    <input type="number" name="plant_id" readonly value=plant.plant_id />
+                </label>
+                </div>
+                <div>
+                <label>
+                    "Botanical name: "
+                    <input type="text" name="botanical_name" value=plant.botanical_name />
+                </label>
+                </div>
+                <div>
+                <label>
+                    "Common name: "
+                    <input type="text" name="common_name" value=plant.common_name />
+                </label>
+                </div>
+                <div>
+                <label>
+                    "Last fed: "
+                    <input type="date" name="last_fed" value=feed_date/>
+                </label>
+                </div>
+                <div>
+                <label>
+                    "Feed interval: "
+                    <input type="number" name="feed_interval" value=plant.feed_interval />
+                </label>
+                </div>
+                <div>
+                <label>
+                    "Last potted: "
+                    <input type="date" name="last_potted" value=pot_date />
+                </label>
+                </div>
+                <div>
+                <label>
+                    "Time to next potting cycle: "
+                    <input type="number" name="potting_interval" value=plant.potting_interval/>
+                </label>
+                </div>
+                <div>
+                <label>
+                    "Last pruned: "
+                    <input type="date" name="last_pruned"  value=prune_date/>
+                </label>
+                </div>
+                <div>
+                <label>
+                    "Time to next pruning cycle: "
+                    <input type="number" name="pruning_interval" value=plant.pruning_interval />
+                </label>
+                </div>
+                <input type="submit" value="Update plant"/>
+            </form>
+        </div>
     }
 }

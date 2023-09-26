@@ -56,6 +56,7 @@ async fn main() -> Result<()> {
         .route("/add-view", get(get_add_view))
         .route("/sort-by-feed", get(get_sorted_feed_plant_view))
         .route("/update-view", post(get_update_view))
+        .route("/update-plant", post(post_update_plant))
         .with_state(app_state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -153,7 +154,6 @@ async fn index(State(app): State<AppState>) -> Html<String> {
                     plants=plants
                 />
             </body>
-
         }
     });
 
@@ -263,6 +263,24 @@ pub async fn get_update_view(
     Html(html)
 }
 
+pub async fn post_update_plant(
+    State(app): State<AppState>,
+    Form(plant): Form<Plant>,
+) -> Html<String> {
+    let pool = &app.lock().await.db_pool;
+    db_api::update_plant(pool, plant).await.unwrap();
+    let plants = get_all_plants(pool, 1).await.unwrap();
+
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! { cx,
+            <PlantView
+                plants=plants
+            />
+        }
+    });
+    Html(html)
+}
+
 pub async fn notify_users_of_required_actions(State(app): State<AppState>) {
     let pool = &app.lock().await.db_pool;
 
@@ -293,16 +311,16 @@ pub async fn notify_users_of_required_actions(State(app): State<AppState>) {
 }
 
 fn get_days_till_next_feed(plant: &Plant) -> (String, String, String) {
-    fn do_sub(last: time::Date, days: i32) -> i64 {
+    fn do_sub(days: i32) -> i64 {
         let cur_date = time::OffsetDateTime::now_utc();
 
         let next_date = cur_date + time::Duration::days(days as i64);
 
         (next_date - cur_date).whole_days()
     }
-    let feed_int = do_sub(plant.last_fed, plant.feed_interval);
-    let pot_int = do_sub(plant.last_potted, plant.potting_interval);
-    let prune_int = do_sub(plant.last_pruned, plant.pruning_interval);
+    let feed_int = do_sub(plant.feed_interval);
+    let pot_int = do_sub(plant.potting_interval);
+    let prune_int = do_sub(plant.pruning_interval);
     let sentinel = String::from("Overdue");
 
     (
