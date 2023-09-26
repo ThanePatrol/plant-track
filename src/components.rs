@@ -15,14 +15,6 @@ pub fn MainView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
                         hx-swap="innerHTML"
                     >"View plants"</button>
 
-                    <button id="update-button"
-                        class="main-buttons"
-                        hx-get="/update-view"
-                        hx-trigger="click"
-                        hx-target="#main-view"
-                        hx-swap="innherHTML"
-                    >"Update plants"</button> //todo - add view plant func.
-
                     <button id="add-button"
                         class="main-buttons"
                         hx-get="/add-view"
@@ -50,6 +42,20 @@ pub fn MainView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
                         hx-target="#plants"
                         hx-swap="outerHTML"
                     >"Sort by least recently pruned"</button>
+                    <div class="search-bar">
+                        <input
+                            class="search-input"
+                            type="search"
+                            name="search_string"
+                            placeholder="Type to search plants"
+                            hx-post="/search-plants"
+                            hx-trigger="keyup changed delay:500ms, search"
+                            hx-target="#plants"
+                            hx-indicator=".htmx-indicator"
+                        />
+                        <span class="htmx-indicator">"Searching..."</span> //TODO - animated svg
+
+                    </div>
                 </div>
             </div>
             <main id="main-view">

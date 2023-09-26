@@ -2,7 +2,7 @@ use axum::{
     extract::{Form, State},
     response::Html,
     routing::{get, get_service, post},
-    Json, Router,
+    Router,
 };
 
 use anyhow::Result;
@@ -11,17 +11,15 @@ use leptos::view;
 use leptos::*;
 use mail_send::mail_builder::MessageBuilder;
 use serde::Deserialize;
-use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::postgres::PgRow;
 use sqlx::{FromRow, Row};
 use sqlx::{Pool, Postgres};
 use std::rc::Rc;
-use time::{format_description, Duration};
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use tokio::net::TcpStream;
 use tower_http::services::ServeDir;
 
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -57,6 +55,7 @@ async fn main() -> Result<()> {
         .route("/sort-by-feed", get(get_sorted_feed_plant_view))
         .route("/update-view", post(get_update_view))
         .route("/update-plant", post(post_update_plant))
+        .route("/search-plants", post(search_plants))
         .with_state(app_state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -104,6 +103,11 @@ pub struct Plant {
 #[derive(Deserialize, Debug, Clone)]
 pub struct PlantID {
     pub plant_id: i32,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Search {
+    pub search_string: String,
 }
 
 impl FromRow<'_, PgRow> for Plant {
@@ -160,7 +164,7 @@ async fn index(State(app): State<AppState>) -> Html<String> {
     Html(html)
 }
 
-pub async fn get_add_view(State(app): State<AppState>) -> Html<String> {
+pub async fn get_add_view(State(_app): State<AppState>) -> Html<String> {
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
             <AddPlantView
@@ -270,6 +274,26 @@ pub async fn post_update_plant(
     let pool = &app.lock().await.db_pool;
     db_api::update_plant(pool, plant).await.unwrap();
     let plants = get_all_plants(pool, 1).await.unwrap();
+
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! { cx,
+            <PlantView
+                plants=plants
+            />
+        }
+    });
+    Html(html)
+}
+
+pub async fn search_plants(
+    State(app): State<AppState>,
+    Form(search): Form<Search>,
+) -> Html<String> {
+    let pool = &app.lock().await.db_pool;
+
+    let plants = db_api::search_plants(pool, search.search_string, 1)
+        .await
+        .unwrap(); //TODO - proper user id
 
     let html = leptos::ssr::render_to_string(move |cx| {
         view! { cx,

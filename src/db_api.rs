@@ -1,7 +1,7 @@
-use sqlx::postgres::{PgPoolOptions, PgQueryResult, PgRow};
+use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres, Row};
 
-use super::{App, AppState, Plant};
+use super::Plant;
 use anyhow::Result;
 
 pub async fn init_pool(db_url: &str) -> Result<Pool<Postgres>> {
@@ -108,6 +108,26 @@ pub async fn update_plant(pool: &Pool<Postgres>, plant: Plant) -> Result<()> {
     .execute(pool)
     .await?;
     Ok(())
+}
+
+pub async fn search_plants(
+    pool: &Pool<Postgres>,
+    search: String,
+    user_id: i32,
+) -> Result<Vec<Plant>> {
+    let search = format!("%{}%", search);
+    let rows = sqlx::query_as(
+        r#"
+        SELECT * FROM plants
+        WHERE user_id = $1 AND (botanical_name LIKE $2 OR common_name LIKE $3) 
+        "#,
+    )
+    .bind(user_id)
+    .bind(search.clone())
+    .bind(search)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
 }
 
 pub async fn get_user_email(pool: &Pool<Postgres>, user_id: i32) -> Result<String> {
