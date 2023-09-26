@@ -51,6 +51,7 @@ pub fn MainView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
                             hx-post="/search-plants"
                             hx-trigger="keyup changed delay:500ms, search"
                             hx-target="#plants"
+                            hx-swap="outerHTML"
                             hx-indicator=".htmx-indicator"
                         />
                         <span class="htmx-indicator">"Searching..."</span> //TODO - animated svg

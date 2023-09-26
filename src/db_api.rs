@@ -119,7 +119,7 @@ pub async fn search_plants(
     let rows = sqlx::query_as(
         r#"
         SELECT * FROM plants
-        WHERE user_id = $1 AND (botanical_name LIKE $2 OR common_name LIKE $3) 
+        WHERE user_id = $1 AND (botanical_name ILIKE $2 OR common_name ILIKE $3) 
         "#,
     )
     .bind(user_id)
