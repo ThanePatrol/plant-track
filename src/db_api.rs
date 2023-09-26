@@ -70,6 +70,23 @@ pub async fn get_plants_that_need_attention(
     Ok(rows)
 }
 
+pub async fn get_plant_from_id(
+    pool: &Pool<Postgres>,
+    user_id: i32,
+    plant_id: i32,
+) -> Result<Plant> {
+    let row = sqlx::query_as(
+        r#"
+        SELECT * FROM plants WHERE user_id = $1 AND plant_id = $2;
+        "#,
+    )
+    .bind(user_id)
+    .bind(plant_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(row)
+}
+
 pub async fn get_user_email(pool: &Pool<Postgres>, user_id: i32) -> Result<String> {
     let email = sqlx::query("SELECT email FROM users WHERE user_id = $1")
         .bind(user_id)

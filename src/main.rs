@@ -2,7 +2,7 @@ use axum::{
     extract::{Form, State},
     response::Html,
     routing::{get, get_service, post},
-    Router,
+    Json, Router,
 };
 
 use anyhow::Result;
@@ -55,6 +55,7 @@ async fn main() -> Result<()> {
         .route("/plant-view", get(get_plant_view))
         .route("/add-view", get(get_add_view))
         .route("/sort-by-feed", get(get_sorted_feed_plant_view))
+        .route("/update-view", post(get_update_view))
         .with_state(app_state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -97,6 +98,11 @@ pub struct Plant {
     pub potting_interval: i32,
     pub last_pruned: time::Date,
     pub pruning_interval: i32,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct PlantID {
+    pub plant_id: i32,
 }
 
 impl FromRow<'_, PgRow> for Plant {
@@ -159,6 +165,8 @@ pub async fn get_add_view(State(app): State<AppState>) -> Html<String> {
         view! {cx,
             <AddPlantView
                 user_id=1 //todo - state based value
+                plant_id=None
+                text="Add Plant".into()
             />
         }
     });
@@ -222,11 +230,35 @@ pub async fn post_add_plant(
                     />
                     <AddPlantView
                        user_id = plant.user_id
+                       plant_id=None
+                       text="Add Plant".into()
                     />
                 }
             });
         }
     }
+
+    Html(html)
+}
+
+pub async fn get_update_view(
+    State(app): State<AppState>,
+    Form(plant_id): Form<PlantID>,
+) -> Html<String> {
+    let pool = &app.lock().await.db_pool;
+    let plant = db_api::get_plant_from_id(pool, 1, plant_id.plant_id)
+        .await
+        .unwrap();
+
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! { cx,
+            <UpdateView
+                plant=plant
+                user_id=1
+            />
+
+        }
+    });
 
     Html(html)
 }

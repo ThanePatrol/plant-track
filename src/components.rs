@@ -17,6 +17,10 @@ pub fn MainView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
 
                     <button id="update-button"
                         class="main-buttons"
+                        hx-get="/update-view"
+                        hx-trigger="click"
+                        hx-target="#main-view"
+                        hx-swap="innherHTML"
                     >"Update plants"</button> //todo - add view plant func.
 
                     <button id="add-button"
@@ -79,11 +83,12 @@ pub fn PlantAddFailure(cx: Scope, error: String) -> impl IntoView {
 /// Form for adding plants, user_id is prefilled on server.
 ///
 #[component]
-pub fn AddPlantView(cx: Scope, user_id: i32) -> impl IntoView {
+pub fn AddPlantView(cx: Scope, user_id: i32, plant_id: Option<i32>, text: String) -> impl IntoView {
+    let plant_id = plant_id.unwrap_or(-1);
     view! { cx,
         <div id="add-view">
             <form>
-                <input type="hidden" name="plant_id" value=-1/>
+                <input type="hidden" name="plant_id" value=plant_id/>
                 <input type="hidden" name="user_id" value=user_id.to_string()/>
                 <label for="botanical_name">Botanical name: </label>
                 <input type="text" name="botanical_name" id="botanical_name" required />
@@ -91,24 +96,30 @@ pub fn AddPlantView(cx: Scope, user_id: i32) -> impl IntoView {
                 <label for="common_name">Common name: </label>
                 <input type="text" name="common_name" id="common_name" required />
 
+                <div>
+                    <label for="feed_optional">Is fertilizing optional?</label>
+                    <input type="checkbox" name="feed_optional" id="feed_optional"/>
+                </div>
                 <label class="feed-vis" for="last_fed">Last fertilized: </label>
-                <input type="checkbox" name="feed_optional" id="feed_optional"/>
-                <label for="feed_optional">Is fertilizing optional?</label>
                 <input class="feed-vis" type="date" name="last_fed" id="last_fed" required />
                 <label class="feed-vis" for="feed_interval">Fertilizing interval in days: </label>
                 <input class="feed-vis" type="number" name="feed_interval" id="feed_interval" required />
 
+                <div>
+                    <label for="pot_optional">Is potting optional?</label>
+                    <input type="checkbox" name="pot_optional" id="pot_optional"/>
+                </div>
                 <label class="pot-vis" for="last_potted">Last Potted: </label>
-                <input type="checkbox" name="pot_optional" id="pot_optional"/>
-                <label for="pot_optional">Is potting optional?</label>
                 <input class="pot-vis" type="date" name="last_potted" id="last_potted" required />
                 <label class="pot-vis" for="potting_interval">Potting interval in days: </label>
                 <input class="pot-vis" type="number" name="potting_interval" id="potting_interval" required />
 
+                <div>
+                    <label for="prune_optional">Is pruning optional?</label>
+                    <input type="checkbox" name="prune_optional" id="prune_optional"/>
+                </div>
                 <label class="prune-vis" for="last_pruned">Last pruned: </label>
                 <input class="prune-vis" type="date" name="last_pruned" id="last_pruned" required />
-                <label for="prune_optional">Is pruning optional?</label>
-                <input type="checkbox" name="prune_optional" id="prune_optional"/>
                 <label class="prune-vis" for="pruning_interval">Pruning interval in days: </label>
                 <input class="prune-vis" type="number" name="pruning_interval" id="pruning_interval" required />
 
@@ -117,7 +128,7 @@ pub fn AddPlantView(cx: Scope, user_id: i32) -> impl IntoView {
                     hx-trigger="click"
                     hx-target="#add-view"
                     hx-swap="outerHTML"
-                    >Add new plant</input>
+                    >text</input>
 
             </form>
             <script>
@@ -192,6 +203,7 @@ pub fn PlantItem(cx: Scope, plant: Plant) -> impl IntoView {
     let feed_date = (plant.last_fed.format(&format)).unwrap();
     let pot_date = (plant.last_potted.format(&format)).unwrap();
     let prune_date = (plant.last_pruned.format(&format)).unwrap();
+    //let plant_id_json = format!(r#"{{"plant_id": {} }}"#, plant.plant_id);
 
     view! { cx,
         <div class="plant-container">
@@ -204,6 +216,15 @@ pub fn PlantItem(cx: Scope, plant: Plant) -> impl IntoView {
             <div>Time to next potting cycle: {pot_days}</div>
             <div>Last pruned: {prune_date}</div>
             <div>Time to next pruning cycle: {prune_days}</div>
+            <form>
+                <input type="number" name="plant_id" hidden="true" value=plant.plant_id/>
+                <input type="submit"
+                hx-post="/update-view"
+                hx-trigger="click"
+                hx-target="#main-view"
+                hx-swap="innerHTML"
+                >"Update plant"</input>
+            </form>
         </div>
     }
 }
@@ -215,6 +236,20 @@ pub fn EmailItem(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
         <h3>"Sorry to bother you but your little green plant friends require some attention!"</h3>
         <PlantView
             plants=plants
+        />
+    }
+}
+
+#[component]
+pub fn UpdateView(cx: Scope, plant: Plant, user_id: i32) -> impl IntoView {
+    view! { cx,
+        <h2>"Current plant details"</h2>
+        <PlantItem plant=plant.clone() />
+        <h2>"Fields to update"</h2>
+        <AddPlantView
+            user_id=user_id
+            plant_id=Some(plant.plant_id)
+            text="Update Plant".into()
         />
     }
 }
