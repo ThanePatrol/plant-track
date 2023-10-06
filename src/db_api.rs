@@ -12,11 +12,27 @@ pub async fn init_pool(db_url: &str) -> Result<Pool<Postgres>> {
     Ok(pool)
 }
 
-pub async fn get_all_plants(pool: &Pool<Postgres>, user_id: i32) -> Result<Vec<Plant>> {
-    let rows = sqlx::query_as(r#"SELECT * FROM plants WHERE user_id = $1"#)
-        .bind(user_id)
-        .fetch_all(pool)
-        .await?;
+pub async fn get_all_plants(
+    pool: &Pool<Postgres>,
+    user_id: i32,
+    n_records: String,
+) -> Result<Vec<Plant>> {
+    let limit = match n_records.parse::<i32>().unwrap_or(-1) {
+        -1 => None,
+        x => Some(x),
+    };
+
+    let rows = sqlx::query_as(
+        r#"
+        SELECT * FROM plants
+        WHERE user_id = $1
+        LIMIT $2
+        "#,
+    )
+    .bind(user_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
     Ok(rows)
 }
 

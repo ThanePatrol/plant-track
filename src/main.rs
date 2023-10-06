@@ -34,6 +34,7 @@ type AppState = Arc<Mutex<App>>;
 
 static DOES_NOT_NEED: i32 = 100_000; //Sentinel value for a fertilizer/pot/prune interval where
                                      //the user marks it as not relevant for a particular plant
+static N_PLANTS: i32 = 9;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -145,7 +146,7 @@ pub struct Comments {
 
 async fn index(State(app): State<AppState>) -> Html<String> {
     let pool = &app.lock().await.db_pool;
-    let plants = get_all_plants(pool, 1).await.unwrap();
+    let plants = get_all_plants(pool, 1, N_PLANTS.to_string()).await.unwrap();
 
     let html = leptos::ssr::render_to_string(move |cx| {
         view! { cx,
@@ -180,7 +181,7 @@ pub async fn get_add_view(State(_app): State<AppState>) -> Html<String> {
 
 pub async fn get_plant_view(State(app): State<AppState>) -> Html<String> {
     let pool = &app.lock().await.db_pool;
-    let plants = get_all_plants(pool, 1).await.unwrap(); //todo - show default screen
+    let plants = get_all_plants(pool, 1, N_PLANTS.to_string()).await.unwrap(); //todo - show default screen
 
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
@@ -194,7 +195,7 @@ pub async fn get_plant_view(State(app): State<AppState>) -> Html<String> {
 
 pub async fn get_sorted_feed_plant_view(State(app): State<AppState>) -> Html<String> {
     let pool = &app.lock().await.db_pool;
-    let mut plants = get_all_plants(pool, 1).await.unwrap();
+    let mut plants = get_all_plants(pool, 1, N_PLANTS.to_string()).await.unwrap();
     plants.sort_by(|a, b| a.last_fed.cmp(&b.last_fed));
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
@@ -274,7 +275,7 @@ pub async fn post_update_plant(
 ) -> Html<String> {
     let pool = &app.lock().await.db_pool;
     db_api::update_plant(pool, plant).await.unwrap();
-    let plants = get_all_plants(pool, 1).await.unwrap();
+    let plants = get_all_plants(pool, 1, N_PLANTS.to_string()).await.unwrap();
 
     let html = leptos::ssr::render_to_string(move |cx| {
         view! { cx,
