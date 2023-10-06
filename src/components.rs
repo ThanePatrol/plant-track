@@ -22,6 +22,13 @@ pub fn MainView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
                         hx-target="#main-view"
                         hx-swap="innerHTML"
                     >"Add plant"</button>
+                    <button id="view-attn-needed-button"
+                        class="main-buttons"
+                        hx-get="/get-plants-that-need-attention"
+                        hx-trigger="click"
+                        hx-target="#main-view"
+                        hx-swap="innerHTML"
+                    >"See plants that need attention"</button>
                 </div>
                 <div class="button-bar-child button-bar-child-right">
                     <button id="sort-by-feed"

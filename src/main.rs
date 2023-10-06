@@ -56,6 +56,7 @@ async fn main() -> Result<()> {
         .route("/update-view", post(get_update_view))
         .route("/update-plant", post(post_update_plant))
         .route("/search-plants", post(search_plants))
+        .route("/get-plants-that-need-attention", get(get_plants_attn))
         .with_state(app_state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -295,6 +296,21 @@ pub async fn search_plants(
         .await
         .unwrap(); //TODO - proper user id
 
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! { cx,
+            <PlantView
+                plants=plants
+            />
+        }
+    });
+    Html(html)
+}
+
+pub async fn get_plants_attn(State(app): State<AppState>) -> Html<String> {
+    let pool = &app.lock().await.db_pool;
+    let plants = db_api::get_plants_that_need_attention(pool, 1)
+        .await
+        .expect("Error getting plants");
     let html = leptos::ssr::render_to_string(move |cx| {
         view! { cx,
             <PlantView
