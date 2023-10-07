@@ -332,3 +332,24 @@ pub fn UpdateView(cx: Scope, plant: Plant, user_id: i32) -> impl IntoView {
         </div>
     }
 }
+
+#[component]
+pub fn LoginView(cx: Scope) -> impl IntoView {
+    view! {cx,
+        <form
+            id="login-form"
+            hx-post="/auth"
+            hx-trigger="submit"
+        >
+            <label>
+                "Username: "
+                <input type="text" name="client-id"/>
+            </label>
+            <label>
+                "Password: "
+                <input type="password" name="client-secret"/>
+            </label>
+            <input type="submit" value="Log in"/>
+        </form>
+    }
+}

@@ -16,6 +16,7 @@ use anyhow::Result;
 use leptos::view;
 use leptos::*;
 use mail_send::mail_builder::MessageBuilder;
+use middleware::authorize;
 use serde::Deserialize;
 use serde_json::json;
 use sqlx::postgres::PgRow;
@@ -39,6 +40,7 @@ mod db_api;
 use db_api::*;
 
 mod middleware;
+use crate::middleware::AuthError;
 
 type AppState = Arc<Mutex<App>>;
 
@@ -72,6 +74,8 @@ async fn main() -> Result<()> {
         .route("/update-plant", post(post_update_plant))
         .route("/search-plants", post(search_plants))
         .route("/get-plants-that-need-attention", get(get_plants_attn))
+        .route("/login", get(get_login_page))
+        .route("/auth", post(authorize))
         .with_state(app_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -194,7 +198,16 @@ async fn index(State(app): State<AppState>) -> Html<String> {
     Html(html)
 }
 
-#[debug_handler]
+async fn get_login_page(State(app): State<AppState>) -> Html<String> {
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! {cx,
+            <LoginView/>
+        }
+    });
+
+    Html(html)
+}
+
 pub async fn get_add_view(State(_app): State<AppState>) -> Html<String> {
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
