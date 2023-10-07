@@ -1,8 +1,14 @@
 use axum::{
-    extract::{Form, State},
-    response::Html,
+    async_trait, debug_handler,
+    extract::{Form, FromRequestParts, State},
+    http::{request::Parts, StatusCode},
+    response::{Html, IntoResponse, Response},
     routing::{get, get_service, post},
-    Router,
+    Json, RequestPartsExt, Router,
+};
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
+    TypedHeader,
 };
 
 use anyhow::Result;
@@ -11,6 +17,7 @@ use leptos::view;
 use leptos::*;
 use mail_send::mail_builder::MessageBuilder;
 use serde::Deserialize;
+use serde_json::json;
 use sqlx::postgres::PgRow;
 use sqlx::{FromRow, Row};
 use sqlx::{Pool, Postgres};
@@ -22,13 +29,16 @@ use tokio::sync::Mutex;
 
 use tower_http::services::ServeDir;
 
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use once_cell::sync::Lazy;
 use tokio::io::{AsyncRead, AsyncWrite};
-
 mod components;
 use components::*;
 
 mod db_api;
 use db_api::*;
+
+mod middleware;
 
 type AppState = Arc<Mutex<App>>;
 
@@ -36,15 +46,19 @@ static DOES_NOT_NEED: i32 = 100_000; //Sentinel value for a fertilizer/pot/prune
                                      //the user marks it as not relevant for a particular plant
 static N_PLANTS: i32 = 9;
 
+static KEYS: Lazy<Keys> = Lazy::new(|| {
+    dotenvy::from_path("./.env").expect("Error reading .env");
+    let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    Keys::new(secret.as_bytes())
+});
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    dotenvy::from_path("./.env").expect("Error reading .env");
-
     let pool = init_pool(&dotenvy::var("DATABASE_URL").unwrap()).await?;
 
     let app_state = Arc::new(Mutex::new(App {
         db_pool: pool,
-        state: Vec::new(),
+        //state: Vec::new(),
     }));
 
     let app = Router::new()
@@ -60,17 +74,30 @@ async fn main() -> Result<()> {
         .route("/get-plants-that-need-attention", get(get_plants_attn))
         .with_state(app_state);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await?;
 
     Ok(())
 }
+
+pub struct Keys {
+    pub encoding: EncodingKey,
+    pub decoding: DecodingKey,
+}
+
+impl Keys {
+    fn new(secret: &[u8]) -> Self {
+        Self {
+            encoding: EncodingKey::from_secret(secret),
+            decoding: DecodingKey::from_secret(secret),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct App {
     pub db_pool: Pool<Postgres>,
-    pub state: Vec<i32>, //todo - some proper state for the app as a whole
+    //pub state: Vec<i32>, //todo - some proper state for the app as a whole
 }
 
 #[derive(Debug)]
@@ -144,6 +171,7 @@ pub struct Comments {
     pub comment: String,
 }
 
+#[debug_handler]
 async fn index(State(app): State<AppState>) -> Html<String> {
     let pool = &app.lock().await.db_pool;
     let plants = get_all_plants(pool, 1, N_PLANTS.to_string()).await.unwrap();
@@ -166,6 +194,7 @@ async fn index(State(app): State<AppState>) -> Html<String> {
     Html(html)
 }
 
+#[debug_handler]
 pub async fn get_add_view(State(_app): State<AppState>) -> Html<String> {
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
@@ -207,6 +236,7 @@ pub async fn get_sorted_feed_plant_view(State(app): State<AppState>) -> Html<Str
     Html(html)
 }
 
+#[debug_handler]
 pub async fn post_add_plant(
     State(app): State<AppState>,
     Form(mut plant): Form<Plant>,
