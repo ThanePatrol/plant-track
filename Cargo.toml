@@ -25,3 +25,4 @@ mail-send = { version = "0.4" }
 jsonwebtoken = "8"
 once_cell = "1"
 rust-argon2 = "2.0"
+headers = "0.3"

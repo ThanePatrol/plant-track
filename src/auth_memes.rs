@@ -1,6 +1,6 @@
 use axum::{
     async_trait,
-    extract::{FromRequest, FromRequestParts, Request},
+    extract::{FromRequestParts, Request},
     http::{
         header::{self, HeaderMap},
         request::Parts,
@@ -8,7 +8,7 @@ use axum::{
     },
     middleware::{self, Next},
     response::{Html, IntoResponse, Response},
-    Form, Json, RequestPartsExt,
+    Extension, Form, Json, RequestPartsExt,
 };
 
 use axum_extra::{
@@ -16,10 +16,41 @@ use axum_extra::{
     TypedHeader,
 };
 
+use headers::{Cookie, HeaderMapExt};
+
 use crate::KEYS;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+pub async fn check_client(request: Request, next: Next) -> Result<impl IntoResponse, Response> {
+    let request = check_auth(request).await?;
+
+    Ok(next.run(request).await)
+}
+
+async fn check_auth(request: Request) -> Result<Request, Response> {
+    let (mut head, body) = request.into_parts();
+
+    if let Some(cookies) = head.headers.typed_get::<Cookie>() {
+        let user_id =
+            extract_user_id(cookies).map_err(|_| AuthError::MissingCredentials.into_response())?;
+        head.extensions.insert(user_id);
+        Ok(Request::from_parts(head, body))
+    } else {
+        Err(AuthError::InvalidToken.into_response())
+    }
+}
+
+fn extract_user_id(cookie: Cookie) -> Result<i32, AuthError> {
+    if let Some(token) = cookie.get("token") {
+        let token = jsonwebtoken::decode::<Claims>(token, &KEYS.decoding, &Validation::default())
+            .map_err(|_| AuthError::InvalidToken)?;
+        Ok(token.claims.user_id)
+    } else {
+        Err(AuthError::InvalidToken)
+    }
+}
 
 pub async fn authorize(Json(payload): Json<AuthPayload>) -> impl IntoResponse {
     println!("{:?}", payload);

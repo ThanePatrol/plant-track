@@ -2,9 +2,10 @@ use axum::{
     async_trait, debug_handler,
     extract::{Form, FromRequestParts, State},
     http::{request::Parts, StatusCode},
+    middleware::{self, Next},
     response::{Html, IntoResponse, Response},
     routing::{get, get_service, post},
-    Json, RequestPartsExt, Router,
+    Extension, Json, RequestPartsExt, Router,
 };
 use axum_extra::{
     headers::{authorization::Bearer, Authorization},
@@ -16,7 +17,6 @@ use anyhow::Result;
 use leptos::view;
 use leptos::*;
 use mail_send::mail_builder::MessageBuilder;
-use middleware::authorize;
 use serde::Deserialize;
 use serde_json::json;
 use sqlx::postgres::PgRow;
@@ -39,8 +39,8 @@ use components::*;
 mod db_api;
 use db_api::*;
 
-mod middleware;
-use crate::middleware::AuthError;
+mod auth_memes;
+use crate::auth_memes::{authorize, check_client, AuthError};
 
 type AppState = Arc<Mutex<App>>;
 
@@ -76,6 +76,7 @@ async fn main() -> Result<()> {
         .route("/get-plants-that-need-attention", get(get_plants_attn))
         .route("/login", get(get_login_page))
         .route("/auth", post(authorize))
+        .layer(middleware::from_fn(check_client))
         .with_state(app_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -176,7 +177,8 @@ pub struct Comments {
 }
 
 #[debug_handler]
-async fn index(State(app): State<AppState>) -> Html<String> {
+async fn index(State(app): State<AppState>, user_id: Option<Extension<i32>>) -> Html<String> {
+    println!("user_id {:?}", user_id);
     let pool = &app.lock().await.db_pool;
     let plants = get_all_plants(pool, 1, N_PLANTS.to_string()).await.unwrap();
 
