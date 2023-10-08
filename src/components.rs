@@ -338,18 +338,20 @@ pub fn LoginView(cx: Scope) -> impl IntoView {
     view! {cx,
         <form
             id="login-form"
+            action="/auth"
             hx-post="/auth"
             hx-trigger="submit"
+            hx-ext="json-enc"
         >
             <label>
                 "Username: "
-                <input type="text" name="client-id"/>
+                <input type="text" name="client_id"/>
             </label>
             <label>
                 "Password: "
-                <input type="password" name="client-secret"/>
+                <input type="password" name="client_secret"/>
             </label>
-            <input type="submit" value="Log in"/>
+            <input type="submit" value="Submit"/>
         </form>
     }
 }

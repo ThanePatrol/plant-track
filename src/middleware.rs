@@ -1,14 +1,18 @@
 use axum::{
     async_trait,
     extract::{FromRequest, FromRequestParts, Request},
-    http::{request::Parts, StatusCode},
+    http::{
+        header::{self, HeaderMap},
+        request::Parts,
+        StatusCode,
+    },
     middleware::{self, Next},
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Response},
     Form, Json, RequestPartsExt,
 };
 
 use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
+    headers::{authorization::Bearer, Authorization, ContentType},
     TypedHeader,
 };
 
@@ -17,7 +21,7 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-pub async fn authorize(Form(payload): Form<AuthPayload>) -> Result<Json<AuthBody>, AuthError> {
+pub async fn authorize(Json(payload): Json<AuthPayload>) -> impl IntoResponse {
     println!("{:?}", payload);
     // Check if the user sent the credentials
     if payload.client_id.is_empty() || payload.client_secret.is_empty() {
@@ -29,8 +33,7 @@ pub async fn authorize(Form(payload): Form<AuthPayload>) -> Result<Json<AuthBody
     }
     let claims = Claims {
         sub: "b@b.com".to_owned(),
-        company: "ACME".to_owned(),
-        // Mandatory expiry time as UTC timestamp
+        user_id: 1,
         exp: 2000000000, // May 2033
     };
     // Create the authorization token
@@ -39,8 +42,16 @@ pub async fn authorize(Form(payload): Form<AuthPayload>) -> Result<Json<AuthBody
 
     println!("ok {:?}", payload);
 
-    // Send the authorized token
-    Ok(Json(AuthBody::new(token)))
+    let html = Html("<p>Logged in</p>".to_string());
+    let cookie_str = format!("token={}; HttpOnly; SameSite=Strict", token);
+
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/html")
+        .header(header::SET_COOKIE, cookie_str)
+        .body(html.0)
+        .unwrap();
+    Ok(response)
 }
 
 impl AuthBody {
@@ -104,9 +115,9 @@ impl Keys {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    sub: String,
-    company: String,
-    exp: usize,
+    sub: String, //subject
+    exp: usize,  //expiry
+    user_id: i32,
 }
 
 #[derive(Debug, Serialize)]
