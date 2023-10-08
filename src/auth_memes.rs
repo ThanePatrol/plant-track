@@ -7,7 +7,7 @@ use axum::{
         StatusCode,
     },
     middleware::{self, Next},
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     Extension, Form, Json, RequestPartsExt,
 };
 
@@ -23,10 +23,16 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-pub async fn check_client(request: Request, next: Next) -> Result<impl IntoResponse, Response> {
-    let request = check_auth(request).await?;
-
-    Ok(next.run(request).await)
+pub async fn check_client(request: Request, next: Next) -> Result<impl IntoResponse, Redirect> {
+    //user is logged in
+    let request = check_auth(request).await;
+    if request.is_ok() {
+        Ok(next
+            .run(request.expect("We just checked is user is logged in"))
+            .await)
+    } else {
+        Err(Redirect::temporary("/login"))
+    }
 }
 
 async fn check_auth(request: Request) -> Result<Request, Response> {

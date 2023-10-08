@@ -338,10 +338,11 @@ pub fn LoginView(cx: Scope) -> impl IntoView {
     view! {cx,
         <form
             id="login-form"
-            action="/auth"
             hx-post="/auth"
             hx-trigger="submit"
             hx-ext="json-enc"
+            hx-target="#login-form"
+            hx-swap="outerHTML"
         >
             <label>
                 "Username: "
@@ -353,5 +354,20 @@ pub fn LoginView(cx: Scope) -> impl IntoView {
             </label>
             <input type="submit" value="Submit"/>
         </form>
+    }
+}
+
+#[component]
+pub fn NotLoggedInMain(cx: Scope) -> impl IntoView {
+    view! { cx,
+        <head>
+            <script src="https://unpkg.com/htmx.org@1.9.2" integrity="sha384-L6OqL9pRWyyFU3+/bjdSri+iIphTN/bvYyM37tICVyOJkWZLpP2vGn6VUEXgzg6h" crossorigin="anonymous"></script>
+            <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
+            <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet"/>
+            <link rel="stylesheet" href="./css/styles.css"/>
+        </head>
+        <body>
+            <LoginView/>
+        </body>
     }
 }

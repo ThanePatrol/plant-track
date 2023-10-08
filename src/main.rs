@@ -63,8 +63,9 @@ async fn main() -> Result<()> {
         //state: Vec::new(),
     }));
 
-    let app = Router::new()
-        .nest_service("/css", get_service(ServeDir::new("resources/css")))
+    let css_server = ServeDir::new("resources/css");
+
+    let protected_routes = Router::new()
         .route("/", get(index))
         .route("/add-plant", post(post_add_plant))
         .route("/plant-view", get(get_plant_view))
@@ -74,10 +75,18 @@ async fn main() -> Result<()> {
         .route("/update-plant", post(post_update_plant))
         .route("/search-plants", post(search_plants))
         .route("/get-plants-that-need-attention", get(get_plants_attn))
+        .layer(middleware::from_fn(check_client))
+        .with_state(app_state.clone());
+
+    let unprotected_routes = Router::new()
         .route("/login", get(get_login_page))
         .route("/auth", post(authorize))
-        .layer(middleware::from_fn(check_client))
         .with_state(app_state);
+
+    let app = Router::new()
+        .merge(protected_routes)
+        .merge(unprotected_routes)
+        .nest_service("/css", get_service(css_server));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await?;
@@ -191,7 +200,6 @@ async fn index(State(app): State<AppState>, user_id: Option<Extension<i32>>) -> 
                 <link rel="stylesheet" href="./css/styles.css"/>
             </head>
             <body>
-                <LoginView/>
                 <MainView
                     plants=plants
                 />
@@ -205,7 +213,7 @@ async fn index(State(app): State<AppState>, user_id: Option<Extension<i32>>) -> 
 async fn get_login_page(State(app): State<AppState>) -> Html<String> {
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
-            <LoginView/>
+            <NotLoggedInMain/>
         }
     });
 
