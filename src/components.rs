@@ -2,6 +2,23 @@ use super::Plant;
 use leptos::*;
 
 #[component]
+pub fn Index(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
+    view! { cx,
+        <head>
+            <script src="https://unpkg.com/htmx.org@1.9.2" integrity="sha384-L6OqL9pRWyyFU3+/bjdSri+iIphTN/bvYyM37tICVyOJkWZLpP2vGn6VUEXgzg6h" crossorigin="anonymous"></script>
+            <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
+            <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet"/>
+            <link rel="stylesheet" href="./css/styles.css"/>
+        </head>
+        <body>
+            <MainView
+                plants=plants
+            />
+        </body>
+    }
+}
+
+#[component]
 pub fn MainView(cx: Scope, plants: Vec<Plant>) -> impl IntoView {
     view! {cx,
         <div class="site-wrapper">
@@ -379,12 +396,10 @@ pub fn SignUpForm(cx: Scope) -> impl IntoView {
     view! { cx,
         <form
             id="signup-form"
-            hx-post="/signup"
-            hx-trigger="submit"
-            hx-ext="json-enc"
-            hx-target="#signup-form"
-            hx-swap="outerHTML"
+            action="/signup"
+            method="post"
         >
+            <input type="hidden" name="user_id" value="-1"/>
             <label>
                 "First name: "
                 <input type="text" name="first_name" required=true/>
@@ -399,10 +414,13 @@ pub fn SignUpForm(cx: Scope) -> impl IntoView {
             </label>
             <label>
                 "Password: "
-                <input type="password" name="passwd" required=true/>
+                <input type="password" name="password_hash" required=true/>
             </label>
-            <input type="submit" value="Submit"/>
+            <input
+            type="submit"
+            value="Submit"
+            onclick="this.disabled=true;this.value='Sending, please wait...';this.form.submit();"
+            />
         </form>
     }
-
 }

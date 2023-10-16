@@ -2,30 +2,30 @@ use axum::{
     async_trait,
     extract::{FromRequestParts, Request},
     http::{
-        header::{self, HeaderMap},
+        header::{self},
         request::Parts,
         StatusCode,
     },
-    middleware::{self, Next},
-    response::{Html, IntoResponse, Redirect, Response},
-    Extension, Form, Json, RequestPartsExt,
+    middleware::Next,
+    response::{IntoResponse, Redirect, Response},
+    Json, RequestPartsExt,
 };
 
 use axum_extra::{
-    headers::{authorization::Bearer, Authorization, ContentType},
+    headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
 
 use headers::{Cookie, HeaderMapExt};
+use time::{Duration, Instant};
 
 use crate::KEYS;
-use argon2::{self, Config};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 pub async fn check_client(request: Request, next: Next) -> Result<impl IntoResponse, Redirect> {
-    //user is logged in
+    //is user logged in
     let request = check_auth(request).await;
     if request.is_ok() {
         Ok(next
@@ -58,9 +58,8 @@ fn extract_user_id(cookie: Cookie) -> Result<i32, AuthError> {
         Err(AuthError::InvalidToken)
     }
 }
-
+//TODO - this is the existing user login, change it to actually check data base
 pub async fn authorize(Json(payload): Json<AuthPayload>) -> impl IntoResponse {
-    //println!("{:?}", payload);
     // Check if the user sent the credentials
     if payload.client_id.is_empty() || payload.client_secret.is_empty() {
         return Err(AuthError::MissingCredentials);
@@ -80,7 +79,7 @@ pub async fn authorize(Json(payload): Json<AuthPayload>) -> impl IntoResponse {
 
     println!("ok {:?}", payload);
 
-    let html = leptos::ssr::render_to_string(move |cx| {});
+    let html = leptos::ssr::render_to_string(move |_cx| {});
     let cookie_str = format!("token={}; HttpOnly; SameSite=Strict", token);
 
     let response = Response::builder()
@@ -92,9 +91,26 @@ pub async fn authorize(Json(payload): Json<AuthPayload>) -> impl IntoResponse {
     Ok(response)
 }
 
+pub fn get_jwt_cookie_for_new_user(payload: AuthPayload) -> String {
+    let claims = Claims {
+        sub: "b@b".to_owned(),
+        user_id: 1,
+        exp: time::OffsetDateTime::now_utc().unix_timestamp() as usize
+            + Duration::days(30).whole_seconds() as usize,
+    };
+    // Create the authorization token
+    let token = encode(&Header::default(), &claims, &KEYS.encoding)
+        .map_err(|_| AuthError::TokenCreation)
+        .unwrap();
+    let cookie_str = format!("token={}; HttpOnly; SameSite=Strict", token);
+    cookie_str
+}
+
 pub fn hash_password(pasword: String) -> String {
-    let config = Config::default();
-    let hash = argon2::hash_encoded(pasword.as_bytes(), b"randomsalt", &config).unwrap();
+    let start = Instant::now();
+    let hash = bcrypt::hash(pasword, bcrypt::DEFAULT_COST).unwrap();
+    let end = Instant::now();
+    println!("hashing config took {:?}", end - start);
     hash
 }
 

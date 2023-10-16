@@ -1,15 +1,15 @@
+use auth_memes::get_jwt_cookie_for_new_user;
 use axum::{
-    async_trait, debug_handler,
-    extract::{Form, FromRequestParts, State},
-    http::{request::Parts, StatusCode},
-    middleware::{self, Next},
+    debug_handler,
+    extract::{Form, State},
+    http::{
+        header::{self},
+        StatusCode,
+    },
+    middleware::{self},
     response::{Html, IntoResponse, Response},
     routing::{get, get_service, post},
-    Extension, Json, RequestPartsExt, Router,
-};
-use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
-    TypedHeader,
+    Extension, Router,
 };
 
 use anyhow::Result;
@@ -18,19 +18,19 @@ use leptos::view;
 use leptos::*;
 use mail_send::mail_builder::MessageBuilder;
 use serde::Deserialize;
-use serde_json::json;
+
 use sqlx::postgres::PgRow;
 use sqlx::{FromRow, Row};
 use sqlx::{Pool, Postgres};
 use std::rc::Rc;
+use time::Instant;
 
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use tower_http::services::ServeDir;
 
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey};
 use once_cell::sync::Lazy;
 use tokio::io::{AsyncRead, AsyncWrite};
 mod components;
@@ -40,12 +40,10 @@ mod db_api;
 use db_api::*;
 
 mod auth_memes;
-use crate::auth_memes::{authorize, check_client, AuthError};
+use crate::auth_memes::{authorize, check_client, AuthPayload};
 
 type AppState = Arc<Mutex<App>>;
 
-static DOES_NOT_NEED: i32 = 100_000; //Sentinel value for a fertilizer/pot/prune interval where
-                                     //the user marks it as not relevant for a particular plant
 static N_PLANTS: i32 = 9;
 
 static KEYS: Lazy<Keys> = Lazy::new(|| {
@@ -115,15 +113,15 @@ pub struct App {
     //pub state: Vec<i32>, //todo - some proper state for the app as a whole
 }
 
-#[derive(Debug)]
-pub struct UserState {
-    user_id: usize,
-    plants: Rc<Vec<Plant>>, //to cache the current list of plants, rather than always hitting db
-}
+//  #[derive(Debug)]
+//  pub struct UserState {
+//      user_id: usize,
+//      plants: Rc<Vec<Plant>>, //to cache the current list of plants, rather than always hitting db
+//  }
 
 #[derive(Clone, Deserialize, Debug, sqlx::FromRow)]
 pub struct User {
-    pub user_id: u32,
+    pub user_id: i32,
     pub first_name: String,
     pub last_name: String,
     pub email: String,
@@ -188,30 +186,24 @@ pub struct Comments {
 }
 
 async fn index(State(app): State<AppState>, user_id: Option<Extension<i32>>) -> Html<String> {
-    println!("user_id {:?}", user_id);
     let pool = &app.lock().await.db_pool;
-    let plants = get_all_plants(pool, 1, N_PLANTS.to_string()).await.unwrap();
+    let user_id = user_id.unwrap_or(Extension(1)).0;
+    let plants = get_all_plants(pool, user_id, N_PLANTS.to_string())
+        .await
+        .unwrap();
 
     let html = leptos::ssr::render_to_string(move |cx| {
         view! { cx,
-            <head>
-                <script src="https://unpkg.com/htmx.org@1.9.2" integrity="sha384-L6OqL9pRWyyFU3+/bjdSri+iIphTN/bvYyM37tICVyOJkWZLpP2vGn6VUEXgzg6h" crossorigin="anonymous"></script>
-                <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
-                <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet"/>
-                <link rel="stylesheet" href="./css/styles.css"/>
-            </head>
-            <body>
-                <MainView
-                    plants=plants
-                />
-            </body>
+            <Index
+                plants=plants
+            />
         }
     });
 
     Html(html)
 }
 
-async fn get_login_page(State(app): State<AppState>) -> Html<String> {
+async fn get_login_page(State(_app): State<AppState>) -> Html<String> {
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
             <NotLoggedInMain/>
@@ -221,19 +213,39 @@ async fn get_login_page(State(app): State<AppState>) -> Html<String> {
     Html(html)
 }
 
-async fn signup_user(State(app): State<AppState>, Form(mut user): Form<User>) -> Html<String> {
+async fn signup_user(State(app): State<AppState>, Form(user): Form<User>) -> impl IntoResponse {
+    println!("{:?}", user);
+    let mut user = user;
     let pool = &app.lock().await.db_pool;
+    let start = Instant::now();
     let pw_hash = auth_memes::hash_password(user.password_hash);
-    user.password_hash = pw_hash;
-    let user_id = db_api::add_user_to_db(pool, user).await.unwrap();
-    //TODO - once user has logged in they need to be sent back to the homepage with  JWT cookie sent
+    let end = Instant::now();
+    println!("{:?}", end - start);
+    user.password_hash = pw_hash.clone();
+    let user_id = db_api::add_user_to_db(pool, user.clone()).await.unwrap();
+    user.user_id = user_id;
 
+    let auth_payload = AuthPayload {
+        client_id: user_id.to_string(),
+        client_secret: pw_hash.clone(),
+    };
+    let cookie = get_jwt_cookie_for_new_user(auth_payload);
+    let plants = Vec::new();
     let html = leptos::ssr::render_to_string(move |cx| {
         view! { cx,
-            <NotLoggedInMain/>
+            <Index
+                plants=plants
+            />
         }
     });
-    Html(html)
+
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/html")
+        .header(header::SET_COOKIE, cookie)
+        .body(html)
+        .unwrap();
+    response
 }
 
 pub async fn get_add_view(State(_app): State<AppState>) -> Html<String> {
@@ -471,5 +483,5 @@ async fn send_email<T: AsyncRead + AsyncWrite + Unpin>(
 
     mail.send(message)
         .await
-        .expect(format!("Error sending email to: {}", email).as_str());
+        .unwrap_or_else(|_| panic!("Error sending email to: {}", email));
 }
