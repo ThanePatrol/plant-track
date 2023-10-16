@@ -127,7 +127,7 @@ pub struct User {
     pub first_name: String,
     pub last_name: String,
     pub email: String,
-    pub password: String,
+    pub password_hash: String,
     pub phone: Option<String>,
 }
 
@@ -223,20 +223,18 @@ async fn get_login_page(State(app): State<AppState>) -> Html<String> {
 
 async fn signup_user(State(app): State<AppState>, Form(mut user): Form<User>) -> Html<String> {
     let pool = &app.lock().await.db_pool;
-    let pw_hash = auth_memes::hash_password(user.password).await.unwrap();
-    user.password = pw_hash;
+    let pw_hash = auth_memes::hash_password(user.password_hash);
+    user.password_hash = pw_hash;
     let user_id = db_api::add_user_to_db(pool, user).await.unwrap();
     //TODO - once user has logged in they need to be sent back to the homepage with  JWT cookie sent
-
 
     let html = leptos::ssr::render_to_string(move |cx| {
         view! { cx,
             <NotLoggedInMain/>
         }
     });
-
+    Html(html)
 }
-
 
 pub async fn get_add_view(State(_app): State<AppState>) -> Html<String> {
     let html = leptos::ssr::render_to_string(move |cx| {

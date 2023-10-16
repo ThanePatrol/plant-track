@@ -171,5 +171,3 @@ pub async fn add_user_to_db(pool: &Pool<Postgres>, user: super::User) -> Result<
     .await?;
     Ok(result.get::<i32, _>("user_id"))
 }
-
-pub async fn check_user_password()
