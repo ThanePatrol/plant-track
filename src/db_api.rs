@@ -155,3 +155,21 @@ pub async fn get_user_email(pool: &Pool<Postgres>, user_id: i32) -> Result<Strin
         .get::<String, _>("email");
     Ok(email)
 }
+
+pub async fn add_user_to_db(pool: &Pool<Postgres>, user: super::User) -> Result<i32> {
+    let result = sqlx::query(
+        "INSERT INTO users (email, password_hash, first_name, last_name)
+            VALUES ($1, $2, $3, $4)
+            RETURNING user_id
+        ",
+    )
+    .bind(user.email)
+    .bind(user.password_hash)
+    .bind(user.first_name)
+    .bind(user.last_name)
+    .fetch_one(pool)
+    .await?;
+    Ok(result.get::<i32, _>("user_id"))
+}
+
+pub async fn check_user_password()

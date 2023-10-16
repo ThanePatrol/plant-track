@@ -22,6 +22,7 @@ use crate::KEYS;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use argon2::{self, Config};
 
 pub async fn check_client(request: Request, next: Next) -> Result<impl IntoResponse, Redirect> {
     //user is logged in
@@ -58,8 +59,9 @@ fn extract_user_id(cookie: Cookie) -> Result<i32, AuthError> {
     }
 }
 
+
 pub async fn authorize(Json(payload): Json<AuthPayload>) -> impl IntoResponse {
-    println!("{:?}", payload);
+    //println!("{:?}", payload);
     // Check if the user sent the credentials
     if payload.client_id.is_empty() || payload.client_secret.is_empty() {
         return Err(AuthError::MissingCredentials);
@@ -79,7 +81,9 @@ pub async fn authorize(Json(payload): Json<AuthPayload>) -> impl IntoResponse {
 
     println!("ok {:?}", payload);
 
-    let html = Html("<p>Logged in</p>".to_string());
+    let html = leptos::ssr::render_to_string(move |cx| {
+
+    })
     let cookie_str = format!("token={}; HttpOnly; SameSite=Strict", token);
 
     let response = Response::builder()
@@ -90,6 +94,13 @@ pub async fn authorize(Json(payload): Json<AuthPayload>) -> impl IntoResponse {
         .unwrap();
     Ok(response)
 }
+
+pub fn hash_password(pasword: String) -> String {
+    let config = Config::default();
+    let hash = argon2::hash_encoded(pasword.as_bytes(), b"randomsalt", &config).unwrap();
+    hash
+}
+
 
 impl AuthBody {
     fn new(access_token: String) -> Self {

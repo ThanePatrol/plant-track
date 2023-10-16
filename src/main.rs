@@ -81,6 +81,7 @@ async fn main() -> Result<()> {
     let unprotected_routes = Router::new()
         .route("/login", get(get_login_page))
         .route("/auth", post(authorize))
+        .route("/signup", post(signup_user))
         .with_state(app_state);
 
     let app = Router::new()
@@ -120,12 +121,13 @@ pub struct UserState {
     plants: Rc<Vec<Plant>>, //to cache the current list of plants, rather than always hitting db
 }
 
-#[derive(Deserialize, Debug, sqlx::FromRow)]
-pub struct Users {
+#[derive(Clone, Deserialize, Debug, sqlx::FromRow)]
+pub struct User {
     pub user_id: u32,
     pub first_name: String,
     pub last_name: String,
     pub email: String,
+    pub password: String,
     pub phone: Option<String>,
 }
 
@@ -185,7 +187,6 @@ pub struct Comments {
     pub comment: String,
 }
 
-#[debug_handler]
 async fn index(State(app): State<AppState>, user_id: Option<Extension<i32>>) -> Html<String> {
     println!("user_id {:?}", user_id);
     let pool = &app.lock().await.db_pool;
@@ -219,6 +220,23 @@ async fn get_login_page(State(app): State<AppState>) -> Html<String> {
 
     Html(html)
 }
+
+async fn signup_user(State(app): State<AppState>, Form(mut user): Form<User>) -> Html<String> {
+    let pool = &app.lock().await.db_pool;
+    let pw_hash = auth_memes::hash_password(user.password).await.unwrap();
+    user.password = pw_hash;
+    let user_id = db_api::add_user_to_db(pool, user).await.unwrap();
+    //TODO - once user has logged in they need to be sent back to the homepage with  JWT cookie sent
+
+
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! { cx,
+            <NotLoggedInMain/>
+        }
+    });
+
+}
+
 
 pub async fn get_add_view(State(_app): State<AppState>) -> Html<String> {
     let html = leptos::ssr::render_to_string(move |cx| {

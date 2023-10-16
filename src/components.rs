@@ -95,7 +95,6 @@ pub fn PlantAddFailure(cx: Scope, error: String) -> impl IntoView {
 }
 
 /// Form for adding plants, user_id is prefilled on server.
-///
 #[component]
 pub fn AddPlantView(cx: Scope, user_id: i32, plant_id: Option<i32>, text: String) -> impl IntoView {
     let plant_id = plant_id.unwrap_or(-1);
@@ -367,7 +366,43 @@ pub fn NotLoggedInMain(cx: Scope) -> impl IntoView {
             <link rel="stylesheet" href="./css/styles.css"/>
         </head>
         <body>
+            <h1>"Welcome to Plant Track!"</h1>
+            <h2>"Please login or sign up to continue"</h2>
             <LoginView/>
+            <SignUpForm/>
         </body>
     }
+}
+
+#[component]
+pub fn SignUpForm(cx: Scope) -> impl IntoView {
+    view! { cx,
+        <form
+            id="signup-form"
+            hx-post="/signup"
+            hx-trigger="submit"
+            hx-ext="json-enc"
+            hx-target="#signup-form"
+            hx-swap="outerHTML"
+        >
+            <label>
+                "First name: "
+                <input type="text" name="first_name" required=true/>
+            </label>
+            <label>
+                "Last name: "
+                <input type="text" name="last_name" required=true/>
+            </label>
+            <label>
+                "Email Address: "
+                <input type="text" name="email" required=true/>
+            </label>
+            <label>
+                "Password: "
+                <input type="password" name="passwd" required=true/>
+            </label>
+            <input type="submit" value="Submit"/>
+        </form>
+    }
+
 }
