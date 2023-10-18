@@ -354,19 +354,18 @@ pub fn LoginView(cx: Scope) -> impl IntoView {
     view! {cx,
         <form
             id="login-form"
-            hx-post="/auth"
+            hx-post="/login-email"
             hx-trigger="submit"
-            hx-ext="json-enc"
-            hx-target="#login-form"
+            hx-target="#not-logged-in-main"
             hx-swap="outerHTML"
         >
             <label>
                 "Username: "
-                <input type="text" name="client_id"/>
+                <input type="text" name="email"/>
             </label>
             <label>
                 "Password: "
-                <input type="password" name="client_secret"/>
+                <input type="password" name="password"/>
             </label>
             <input type="submit" value="Submit"/>
         </form>
@@ -383,10 +382,12 @@ pub fn NotLoggedInMain(cx: Scope) -> impl IntoView {
             <link rel="stylesheet" href="./css/styles.css"/>
         </head>
         <body>
-            <h1>"Welcome to Plant Track!"</h1>
-            <h2>"Please login or sign up to continue"</h2>
-            <LoginView/>
-            <SignUpForm/>
+            <div id="not-logged-in-main">
+                <h1>"Welcome to Plant Track!"</h1>
+                <h2>"Please login or sign up to continue"</h2>
+                <LoginView/>
+                <SignUpForm/>
+            </div>
         </body>
     }
 }

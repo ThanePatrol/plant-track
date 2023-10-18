@@ -58,7 +58,7 @@ fn extract_user_id(cookie: Cookie) -> Result<i32, AuthError> {
         Err(AuthError::InvalidToken)
     }
 }
-//TODO - this is the existing user login, change it to actually check data base
+//TODO - This code is not used but the boilerplate may be usefuil for other methods. this is the existing user login, change it to actually check data base
 pub async fn authorize(Json(payload): Json<AuthPayload>) -> impl IntoResponse {
     // Check if the user sent the credentials
     if payload.client_id.is_empty() || payload.client_secret.is_empty() {
@@ -95,7 +95,7 @@ pub fn get_jwt_cookie_for_new_user(payload: AuthPayload) -> String {
     let user_id = payload.client_id;
 
     let claims = Claims {
-        sub: "b@b".to_owned(),
+        sub: "b@b".to_owned(),                    //TODO - maybe user email here?
         user_id: user_id.parse::<i32>().unwrap(), // should never fail as user id is an integer.
         exp: time::OffsetDateTime::now_utc().unix_timestamp() as usize
             + Duration::days(30).whole_seconds() as usize,

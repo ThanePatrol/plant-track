@@ -1,6 +1,8 @@
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres, Row};
 
+use crate::User;
+
 use super::Plant;
 use anyhow::Result;
 
@@ -34,6 +36,14 @@ pub async fn get_all_plants(
     .fetch_all(pool)
     .await?;
     Ok(rows)
+}
+
+pub async fn get_user_from_email(pool: &Pool<Postgres>, email: String) -> Result<User> {
+    let user = sqlx::query_as("SELECT * FROM users WHERE email = $1")
+        .bind(email)
+        .fetch_one(pool)
+        .await?;
+    Ok(user)
 }
 
 pub async fn add_plant_to_db(pool: &Pool<Postgres>, plant: Plant) -> Result<i32> {

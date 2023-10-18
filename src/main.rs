@@ -1,4 +1,4 @@
-use auth_memes::get_jwt_cookie_for_new_user;
+use auth_memes::{check_password, get_jwt_cookie_for_new_user, hash_password};
 use axum::{
     debug_handler,
     extract::{Form, State},
@@ -79,6 +79,7 @@ async fn main() -> Result<()> {
         .route("/login", get(get_login_page))
         .route("/auth", post(authorize))
         .route("/signup", post(signup_user))
+        .route("/login-email", post(login_user))
         .with_state(app_state);
 
     let app = Router::new()
@@ -184,6 +185,12 @@ pub struct Comments {
     pub comment: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UserLogin {
+    pub email: String,
+    pub password: String,
+}
+
 async fn index(State(app): State<AppState>, Extension(user_id): Extension<i32>) -> Html<String> {
     let pool = &app.lock().await.db_pool;
     let plants = get_all_plants(pool, user_id, N_PLANTS.to_string())
@@ -211,15 +218,59 @@ async fn get_login_page(State(_app): State<AppState>) -> Html<String> {
     Html(html)
 }
 
+async fn login_user(
+    State(app): State<AppState>,
+    Form(user_login): Form<UserLogin>,
+) -> impl IntoResponse {
+    let pool = &app.lock().await.db_pool;
+
+    //TODO - if this fails then we should return a 403 as the user hasn't signed up yet or signed
+    //up with incorrect email
+    let user = db_api::get_user_from_email(pool, user_login.email)
+        .await
+        .unwrap();
+
+    let is_correct_pw = check_password(&user_login.password, &user.password_hash);
+    if !is_correct_pw {
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body("Incorrect Password".to_owned())
+            .unwrap();
+    }
+
+    let auth_payload = AuthPayload {
+        client_id: user.user_id.to_string(),
+        client_secret: user.password_hash,
+    };
+    let cookie = get_jwt_cookie_for_new_user(auth_payload);
+    let plants = db_api::get_all_plants(pool, user.user_id, 9.to_string())
+        .await
+        .unwrap_or(Vec::new());
+
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! { cx,
+            <Index
+                plants=plants
+            />
+        }
+    });
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::SET_COOKIE, cookie)
+        .header(header::CONTENT_TYPE, "text/html")
+        .body(html)
+        .unwrap();
+    response
+}
+
 async fn signup_user(State(app): State<AppState>, Form(user): Form<User>) -> impl IntoResponse {
     println!("{:?}", user);
     let mut user = user;
     let pool = &app.lock().await.db_pool;
-    let start = Instant::now();
     let pw_hash = auth_memes::hash_password(user.password_hash);
-    let end = Instant::now();
-    println!("{:?}", end - start);
+
     user.password_hash = pw_hash.clone();
+
     let user_id = db_api::add_user_to_db(pool, user.clone()).await.unwrap();
     user.user_id = user_id;
 
@@ -395,7 +446,7 @@ pub async fn search_plants(
 
     let plants = db_api::search_plants(pool, search.search_string, user_id)
         .await
-        .unwrap(); //TODO - proper user id
+        .unwrap();
 
     let html = leptos::ssr::render_to_string(move |cx| {
         view! { cx,
