@@ -1,9 +1,7 @@
-.idea
-
-target
-resources/
+.idea/*
+.git/*
+target/*
 out
 
 *.md
-.env
 *.nix

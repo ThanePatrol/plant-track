@@ -46,7 +46,6 @@ type AppState = Arc<Mutex<App>>;
 static N_PLANTS: i32 = 9;
 
 static KEYS: Lazy<Keys> = Lazy::new(|| {
-    //dotenvy::from_path("./.env").expect("Error reading .env");
     let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     Keys::new(secret.as_bytes())
 });
