@@ -22,7 +22,6 @@ use serde::Deserialize;
 use sqlx::postgres::PgRow;
 use sqlx::{FromRow, Row};
 use sqlx::{Pool, Postgres};
-use std::rc::Rc;
 use time::Instant;
 
 use std::sync::Arc;
@@ -69,7 +68,7 @@ async fn main() -> Result<()> {
         .route("/plant-view", get(get_plant_view))
         .route("/add-view", get(get_add_view))
         .route("/sort-by-feed", get(get_sorted_feed_plant_view))
-        .route("/update-view", post(get_update_view))
+        .route("/update-view", get(get_update_view))
         .route("/update-plant", post(post_update_plant))
         .route("/search-plants", post(search_plants))
         .route("/get-plants-that-need-attention", get(get_plants_attn))
@@ -185,9 +184,8 @@ pub struct Comments {
     pub comment: String,
 }
 
-async fn index(State(app): State<AppState>, user_id: Option<Extension<i32>>) -> Html<String> {
+async fn index(State(app): State<AppState>, Extension(user_id): Extension<i32>) -> Html<String> {
     let pool = &app.lock().await.db_pool;
-    let user_id = user_id.unwrap_or(Extension(1)).0;
     let plants = get_all_plants(pool, user_id, N_PLANTS.to_string())
         .await
         .unwrap();
@@ -248,11 +246,14 @@ async fn signup_user(State(app): State<AppState>, Form(user): Form<User>) -> imp
     response
 }
 
-pub async fn get_add_view(State(_app): State<AppState>) -> Html<String> {
+pub async fn get_add_view(
+    State(_app): State<AppState>,
+    Extension(user_id): Extension<i32>,
+) -> Html<String> {
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
             <AddPlantView
-                user_id=1 //todo - state based value
+                user_id=user_id
                 plant_id=None
                 text="Add Plant".into()
             />
@@ -261,9 +262,14 @@ pub async fn get_add_view(State(_app): State<AppState>) -> Html<String> {
     Html(html)
 }
 
-pub async fn get_plant_view(State(app): State<AppState>) -> Html<String> {
+pub async fn get_plant_view(
+    State(app): State<AppState>,
+    Extension(user_id): Extension<i32>,
+) -> Html<String> {
     let pool = &app.lock().await.db_pool;
-    let plants = get_all_plants(pool, 1, N_PLANTS.to_string()).await.unwrap(); //todo - show default screen
+    let plants = get_all_plants(pool, user_id, N_PLANTS.to_string())
+        .await
+        .unwrap_or(Vec::new());
 
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
@@ -275,9 +281,14 @@ pub async fn get_plant_view(State(app): State<AppState>) -> Html<String> {
     Html(html)
 }
 
-pub async fn get_sorted_feed_plant_view(State(app): State<AppState>) -> Html<String> {
+pub async fn get_sorted_feed_plant_view(
+    State(app): State<AppState>,
+    Extension(user_id): Extension<i32>,
+) -> Html<String> {
     let pool = &app.lock().await.db_pool;
-    let mut plants = get_all_plants(pool, 1, N_PLANTS.to_string()).await.unwrap();
+    let mut plants = get_all_plants(pool, user_id, N_PLANTS.to_string())
+        .await
+        .unwrap();
     plants.sort_by(|a, b| a.last_fed.cmp(&b.last_fed));
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
@@ -332,10 +343,12 @@ pub async fn post_add_plant(
 
 pub async fn get_update_view(
     State(app): State<AppState>,
+    Extension(user_id): Extension<i32>,
     Form(plant_id): Form<PlantID>,
 ) -> Html<String> {
     let pool = &app.lock().await.db_pool;
-    let plant = db_api::get_plant_from_id(pool, 1, plant_id.plant_id)
+    //let user_id = user_id.unwrap_or(Extension(1)).0;
+    let plant = db_api::get_plant_from_id(pool, user_id, plant_id.plant_id)
         .await
         .unwrap();
 
@@ -343,7 +356,7 @@ pub async fn get_update_view(
         view! { cx,
             <UpdateView
                 plant=plant
-                user_id=1
+                user_id=user_id
             />
 
         }
@@ -354,11 +367,14 @@ pub async fn get_update_view(
 
 pub async fn post_update_plant(
     State(app): State<AppState>,
+    Extension(user_id): Extension<i32>,
     Form(plant): Form<Plant>,
 ) -> Html<String> {
     let pool = &app.lock().await.db_pool;
     db_api::update_plant(pool, plant).await.unwrap();
-    let plants = get_all_plants(pool, 1, N_PLANTS.to_string()).await.unwrap();
+    let plants = get_all_plants(pool, user_id, N_PLANTS.to_string())
+        .await
+        .unwrap();
 
     let html = leptos::ssr::render_to_string(move |cx| {
         view! { cx,
@@ -372,11 +388,12 @@ pub async fn post_update_plant(
 
 pub async fn search_plants(
     State(app): State<AppState>,
+    Extension(user_id): Extension<i32>,
     Form(search): Form<Search>,
 ) -> Html<String> {
     let pool = &app.lock().await.db_pool;
 
-    let plants = db_api::search_plants(pool, search.search_string, 1)
+    let plants = db_api::search_plants(pool, search.search_string, user_id)
         .await
         .unwrap(); //TODO - proper user id
 
@@ -390,9 +407,13 @@ pub async fn search_plants(
     Html(html)
 }
 
-pub async fn get_plants_attn(State(app): State<AppState>) -> Html<String> {
+pub async fn get_plants_attn(
+    State(app): State<AppState>,
+    user_id: Option<Extension<i32>>,
+) -> Html<String> {
     let pool = &app.lock().await.db_pool;
-    let plants = db_api::get_plants_that_need_attention(pool, 1)
+    let user_id = user_id.unwrap_or(Extension(1)).0;
+    let plants = db_api::get_plants_that_need_attention(pool, user_id)
         .await
         .expect("Error getting plants");
     let html = leptos::ssr::render_to_string(move |cx| {
@@ -407,7 +428,6 @@ pub async fn get_plants_attn(State(app): State<AppState>) -> Html<String> {
 
 pub async fn notify_users_of_required_actions(State(app): State<AppState>) {
     let pool = &app.lock().await.db_pool;
-
     //TODO - loop through users instead of hardcoding a single user
 
     let plants = db_api::get_plants_that_need_attention(pool, 1)

@@ -17,7 +17,7 @@ use axum_extra::{
 };
 
 use headers::{Cookie, HeaderMapExt};
-use time::{Duration, Instant};
+use time::Duration;
 
 use crate::KEYS;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
@@ -92,9 +92,11 @@ pub async fn authorize(Json(payload): Json<AuthPayload>) -> impl IntoResponse {
 }
 
 pub fn get_jwt_cookie_for_new_user(payload: AuthPayload) -> String {
+    let user_id = payload.client_id;
+
     let claims = Claims {
         sub: "b@b".to_owned(),
-        user_id: 1,
+        user_id: user_id.parse::<i32>().unwrap(), // should never fail as user id is an integer.
         exp: time::OffsetDateTime::now_utc().unix_timestamp() as usize
             + Duration::days(30).whole_seconds() as usize,
     };
@@ -107,11 +109,16 @@ pub fn get_jwt_cookie_for_new_user(payload: AuthPayload) -> String {
 }
 
 pub fn hash_password(pasword: String) -> String {
-    let start = Instant::now();
     let hash = bcrypt::hash(pasword, bcrypt::DEFAULT_COST).unwrap();
-    let end = Instant::now();
-    println!("hashing config took {:?}", end - start);
     hash
+}
+//This means any encryption error will result in the user being unable
+//to login. Maybe fix, maybe security feature
+pub fn check_password(password: &String, hash: &String) -> bool {
+    match bcrypt::verify(password, hash) {
+        Ok(result) => result,
+        Err(_) => false,
+    }
 }
 
 impl AuthBody {
