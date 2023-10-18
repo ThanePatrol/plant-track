@@ -1,15 +1,19 @@
-FROM rustlang/rust:nightly-buster
+FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
+WORKDIR /app
 
-WORKDIR /usr/app
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-COPY ./Cargo.toml ./Cargo.toml
-COPY ./Cargo.lock ./Cargo.lock
-COPY ./src ./src
-COPY index.html index.html
+FROM chef AS builder 
+COPY --from=planner /app/recipe.json recipe.json
+# Build dependencies - this is the caching Docker layer!
+RUN cargo chef cook --release --recipe-path recipe.json
+# Build application
+COPY . .
+RUN cargo build --release --bin plant-track
 
-RUN rustup target add wasm32-unknown-unknown
-RUN cargo install trunk
-RUN trunk build --release
-
-EXPOSE 8080
-CMD ["trunk" "serve" "--address" "0.0.0.0"]
+FROM debian:bookworm-slim AS runtime
+WORKDIR /app
+COPY --from=builder /app/target/release/plant-track /usr/local/bin
+ENTRYPOINT ["/usr/local/bin/plant-track"]

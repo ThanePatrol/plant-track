@@ -46,14 +46,14 @@ type AppState = Arc<Mutex<App>>;
 static N_PLANTS: i32 = 9;
 
 static KEYS: Lazy<Keys> = Lazy::new(|| {
-    dotenvy::from_path("./.env").expect("Error reading .env");
+    //dotenvy::from_path("./.env").expect("Error reading .env");
     let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     Keys::new(secret.as_bytes())
 });
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let pool = init_pool(&dotenvy::var("DATABASE_URL").unwrap()).await?;
+    let pool = init_pool(&std::env::var("DATABASE_URL").unwrap()).await?;
 
     let app_state = Arc::new(Mutex::new(App {
         db_pool: pool,
@@ -68,6 +68,8 @@ async fn main() -> Result<()> {
         .route("/plant-view", get(get_plant_view))
         .route("/add-view", get(get_add_view))
         .route("/sort-by-feed", get(get_sorted_feed_plant_view))
+        .route("/sort-by-pot", get(get_sorted_pot_plant_view))
+        .route("/sort-by-prune", get(get_sorted_prune_plant_view))
         .route("/update-view", get(get_update_view))
         .route("/update-plant", post(post_update_plant))
         .route("/search-plants", post(search_plants))
@@ -340,7 +342,57 @@ pub async fn get_sorted_feed_plant_view(
     let mut plants = get_all_plants(pool, user_id, N_PLANTS.to_string())
         .await
         .unwrap();
-    plants.sort_by(|a, b| a.last_fed.cmp(&b.last_fed));
+    plants.sort_by(|a, b| {
+        let next_a = a.last_fed - time::Duration::days(a.feed_interval as i64);
+        let next_b = b.last_fed - time::Duration::days(b.feed_interval as i64);
+        next_a.cmp(&next_b)
+    });
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! {cx,
+            <PlantView
+                plants=plants
+            />
+        }
+    });
+    Html(html)
+}
+
+pub async fn get_sorted_pot_plant_view(
+    State(app): State<AppState>,
+    Extension(user_id): Extension<i32>,
+) -> Html<String> {
+    let pool = &app.lock().await.db_pool;
+    let mut plants = get_all_plants(pool, user_id, N_PLANTS.to_string())
+        .await
+        .unwrap();
+    plants.sort_by(|a, b| {
+        let next_a = a.last_potted - time::Duration::days(a.potting_interval as i64);
+        let next_b = b.last_potted - time::Duration::days(b.potting_interval as i64);
+        next_a.cmp(&next_b)
+    });
+    let html = leptos::ssr::render_to_string(move |cx| {
+        view! {cx,
+            <PlantView
+                plants=plants
+            />
+        }
+    });
+    Html(html)
+}
+
+pub async fn get_sorted_prune_plant_view(
+    State(app): State<AppState>,
+    Extension(user_id): Extension<i32>,
+) -> Html<String> {
+    let pool = &app.lock().await.db_pool;
+    let mut plants = get_all_plants(pool, user_id, N_PLANTS.to_string())
+        .await
+        .unwrap();
+    plants.sort_by(|a, b| {
+        let next_a = a.last_pruned - time::Duration::days(a.pruning_interval as i64);
+        let next_b = b.last_pruned - time::Duration::days(b.pruning_interval as i64);
+        next_a.cmp(&next_b)
+    });
     let html = leptos::ssr::render_to_string(move |cx| {
         view! {cx,
             <PlantView
